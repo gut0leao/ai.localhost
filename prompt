@@ -1,0 +1,145 @@
+Quero criar neste repositório um ambiente local e reproduzível de IA para desenvolvimento com código, usando Docker Compose.
+
+Objetivo:
+Montar uma stack simples, segura, privada e portátil para rodar LLM local em estação de trabalho, inicialmente com:
+
+- Ollama em container
+- Open WebUI em container
+- volumes persistentes para modelos e dados
+- bind apenas em localhost
+- documentação clara para recriar o ambiente em outra máquina
+- comandos auxiliares para subir, parar, testar e baixar modelos
+
+O objetivo do projeto é permitir um ambiente de coding assistido por IA totalmente local, sem dependência de APIs externas, priorizando privacidade, simplicidade e reprodutibilidade.
+
+Premissas:
+- O ambiente deve ser pensado para Linux/WSL2.
+- Não assumir GPU obrigatória.
+- GPU NVIDIA pode ser documentada como opção.
+- Não expor portas para a rede local por padrão.
+- Não depender de serviços cloud.
+- Não enviar dados para APIs externas.
+- Priorizar privacidade e execução local.
+- O Aider inicialmente NÃO deve rodar em container; ele deve ser documentado como ferramenta a ser instalada no host/WSL e apontada para o Ollama local.
+- Evitar inventar informações. Quando houver dúvida técnica, deixar comentário/TODO ou apontar para documentação oficial.
+- Seguir rigorosamente as regras da seção “Permissões e segurança”.
+
+Permissões e segurança:
+- Não forçar execução como root/superusuário por padrão.
+- Usar o usuário padrão das imagens oficiais, salvo quando houver justificativa técnica documentada.
+- Para o serviço `ollama`, aceitar o usuário padrão da imagem oficial, mesmo que seja root dentro do container, desde que:
+  - as portas estejam vinculadas apenas a `127.0.0.1`;
+  - os modelos fiquem em volume nomeado;
+  - não haja montagem de diretórios sensíveis do host;
+  - o container não use `privileged: true`.
+- Não montar `/home`, `~/.ssh`, `/var/run/docker.sock`, repositórios Git pessoais ou outros diretórios sensíveis do host dentro dos containers.
+- Usar volumes nomeados do Docker para persistência.
+- Não usar `privileged: true`.
+- Não usar `network_mode: host`.
+- Caso algum problema de permissão ocorra, documentar a correção mínima necessária, sem recorrer automaticamente a `chmod 777`.
+- Não usar permissões excessivamente abertas.
+- Não introduzir riscos desnecessários de segurança apenas para simplificar setup.
+
+Arquitetura esperada:
+
+WSL2/Linux Host
+└── Docker Compose
+    ├── Ollama
+    │    └── modelos locais persistidos
+    └── Open WebUI
+          └── interface local tipo ChatGPT
+
+Aider (host/WSL)
+    ↓ localhost
+Ollama Container
+
+Objetivo da arquitetura:
+- Portabilidade
+- Privacidade
+- Fácil reinstalação
+- Reprodutibilidade
+- Simplicidade operacional
+
+Entregáveis esperados:
+
+1. Criar um `docker-compose.yml` com:
+- serviço `ollama`
+- serviço `open-webui`
+- volumes persistentes nomeados
+- bind apenas em localhost (`127.0.0.1`)
+- `restart: unless-stopped`
+- `OLLAMA_BASE_URL` configurado corretamente
+- comentários claros quando fizer sentido
+- estrutura simples e legível
+- sem overengineering
+
+2. Criar um arquivo `.env.example` com variáveis configuráveis, por exemplo:
+- `OLLAMA_PORT`
+- `OPEN_WEBUI_PORT`
+- `OLLAMA_MODEL_DEFAULT`
+- eventuais flags opcionais
+- comentários explicativos
+
+3. Criar um `Makefile` (preferencialmente) ou scripts equivalentes com comandos:
+
+- `make up`
+- `make down`
+- `make restart`
+- `make logs`
+- `make ps`
+- `make pull-model`
+- `make run-model`
+- `make models`
+- `make test-ollama`
+- `make test-open-webui`
+- `make shell-ollama`
+
+Os comandos devem ser simples, previsíveis e idempotentes.
+
+4. Criar scripts Bash seguros e reutilizáveis em `scripts/`:
+
+- `scripts/pull-model.sh`
+- `scripts/run-model.sh`
+- `scripts/test-ollama.sh`
+- `scripts/test-open-webui.sh`
+
+Regras dos scripts:
+- usar `set -euo pipefail`
+- não usar comandos destrutivos
+- não assumir paths absolutos específicos do usuário
+- mensagens amigáveis e objetivas
+- comentários claros
+- comportamento previsível
+
+5. Criar um `README.md` completo e bem organizado em português do Brasil contendo:
+
+Seções esperadas:
+
+- Visão geral
+- Objetivos do projeto
+- Arquitetura
+- Pré-requisitos
+- Instalação
+- Primeiro uso
+- Como subir ambiente
+- Como parar ambiente
+- Como atualizar imagens
+- Como baixar modelos
+- Como testar o Ollama
+- Como acessar Open WebUI
+- Como instalar Aider no host/WSL
+- Como configurar Aider para usar Ollama local
+- Exemplo de uso do Aider dentro de um projeto Git
+- Privacidade e segurança
+- Recomendações de performance
+- Recomendações específicas para WSL2
+- Troubleshooting
+- Suporte a GPU NVIDIA (opcional)
+- Roadmap futuro (opcional)
+
+O README deve conter:
+
+Exemplo de download do modelo inicial:
+
+```bash
+make pull-model

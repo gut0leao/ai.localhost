@@ -1,0 +1,11 @@
+services:
+  # Sobreposição opcional para NVIDIA. Use sempre junto ao docker-compose.yml
+  # por meio de `make up-gpu`; o modo padrão continua usando somente CPU.
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

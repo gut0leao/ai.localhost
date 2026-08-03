@@ -1,0 +1,69 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ai-ollama
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_BIND_HOST:-127.0.0.1}:${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: ai-open-webui
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    ports:
+      - "${OPEN_WEBUI_BIND_HOST:-127.0.0.1}:${OPEN_WEBUI_PORT:-3000}:8080"
+    environment:
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      WEBUI_AUTH: "${WEBUI_AUTH:-true}"
+      # ENABLE_PERSISTENT_CONFIG=false faz o Open WebUI honrar estas variaveis
+      # mesmo quando ja existe configuracao persistida no volume.
+      ENABLE_PERSISTENT_CONFIG: "${ENABLE_PERSISTENT_CONFIG:-true}"
+      DEFAULT_MODEL_METADATA: '${DEFAULT_MODEL_METADATA:-{}}'
+      ENABLE_WEB_SEARCH: "${ENABLE_WEB_SEARCH:-false}"
+      ENABLE_SEARCH_QUERY_GENERATION: "${ENABLE_SEARCH_QUERY_GENERATION:-true}"
+      WEB_SEARCH_ENGINE: "${WEB_SEARCH_ENGINE:-searxng}"
+      WEB_SEARCH_RESULT_COUNT: "${WEB_SEARCH_RESULT_COUNT:-3}"
+      WEB_LOADER_CONCURRENT_REQUESTS: "${WEB_LOADER_CONCURRENT_REQUESTS:-5}"
+      SEARXNG_QUERY_URL: "${SEARXNG_QUERY_URL:-http://searxng:8080/search?q=<query>}"
+      # Variaveis legadas mantidas para compatibilidade com builds antigos.
+      ENABLE_RAG_WEB_SEARCH: "${ENABLE_WEB_SEARCH:-false}"
+      RAG_WEB_SEARCH_ENGINE: "${WEB_SEARCH_ENGINE:-searxng}"
+      RAG_WEB_SEARCH_RESULT_COUNT: "${WEB_SEARCH_RESULT_COUNT:-3}"
+      RAG_WEB_SEARCH_CONCURRENT_REQUESTS: "${WEB_LOADER_CONCURRENT_REQUESTS:-5}"
+    volumes:
+      - open-webui-data:/app/backend/data
+
+  searxng:
+    image: docker.io/searxng/searxng:latest
+    container_name: ai-searxng
+    restart: unless-stopped
+    profiles:
+      - web-search
+    ports:
+      - "${SEARXNG_BIND_HOST:-127.0.0.1}:${SEARXNG_PORT:-8080}:8080"
+    environment:
+      SEARXNG_BASE_URL: "http://${SEARXNG_BIND_HOST:-127.0.0.1}:${SEARXNG_PORT:-8080}/"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+      - searxng-cache:/var/cache/searxng:rw
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+volumes:
+  ollama-models:
+  open-webui-data:
+  searxng-cache:
