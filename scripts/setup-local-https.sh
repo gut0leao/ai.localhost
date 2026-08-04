@@ -7,6 +7,7 @@ ENV_PATH="${ROOT_DIR}/${ENV_FILE}"
 CERT_DIR="${ROOT_DIR}/certs"
 CERT_FILE="${CERT_DIR}/local-ai.pem"
 KEY_FILE="${CERT_DIR}/local-ai-key.pem"
+STATE_DIR="${STATE_DIR:-}"
 
 read_env_value() {
   local key="$1"
@@ -34,6 +35,17 @@ fi
 
 mkdir -p "${CERT_DIR}"
 
+CAROOT="$(mkcert -CAROOT)"
+if [[ -n "${STATE_DIR}" ]]; then
+  mkdir -p "${STATE_DIR}"
+  chmod 0700 "${STATE_DIR}"
+  printf '%s\n' "${CAROOT}" >"${STATE_DIR}/mkcert-caroot"
+  if [[ ! -f "${CAROOT}/rootCA.pem" && ! -e "${STATE_DIR}/mkcert-ca-observed" ]]; then
+    touch "${STATE_DIR}/mkcert-ca-created"
+  fi
+  touch "${STATE_DIR}/mkcert-ca-observed"
+fi
+
 echo "Instalando a CA local do mkcert no armazenamento de confiança deste sistema."
 echo "A chave da CA permanece fora do repositório, no diretório administrado pelo mkcert."
 mkcert -install
@@ -49,15 +61,27 @@ chmod 0600 "${KEY_FILE}"
 
 if grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; then
   if command -v certutil.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1; then
-    CAROOT="$(mkcert -CAROOT)"
     ROOT_CA_FILE="${CAROOT}/rootCA.pem"
     WINDOWS_ROOT_CA_FILE="$(wslpath -w "${ROOT_CA_FILE}")"
+    WINDOWS_CA_THUMBPRINT=""
+    if command -v openssl >/dev/null 2>&1; then
+      WINDOWS_CA_THUMBPRINT="$(openssl x509 -in "${ROOT_CA_FILE}" -noout -fingerprint -sha1 \
+        | sed 's/^.*=//' | tr -d ':')"
+    fi
 
     echo "Instalando a CA local no armazenamento do usuário Windows para o navegador do host."
+    WINDOWS_CA_ALREADY_TRUSTED=false
+    if [[ -n "${WINDOWS_CA_THUMBPRINT}" ]] \
+      && certutil.exe -user -store Root "${WINDOWS_CA_THUMBPRINT}" >/dev/null 2>&1; then
+      WINDOWS_CA_ALREADY_TRUSTED=true
+    fi
     if ! certutil.exe -f -user -addstore Root "${WINDOWS_ROOT_CA_FILE}" >/dev/null; then
       echo "Aviso: não foi possível confiar automaticamente na CA no Windows." >&2
       echo "Importe manualmente este certificado no armazenamento 'Autoridades de Certificação Raiz Confiáveis':" >&2
       echo "  ${ROOT_CA_FILE}" >&2
+    elif [[ -n "${STATE_DIR}" && "${WINDOWS_CA_ALREADY_TRUSTED}" == false \
+      && -n "${WINDOWS_CA_THUMBPRINT}" ]]; then
+      printf '%s\n' "${WINDOWS_CA_THUMBPRINT}" >"${STATE_DIR}/windows-ca-thumbprint"
     fi
   else
     echo "Aviso: WSL detectado, mas certutil.exe ou wslpath não está disponível." >&2

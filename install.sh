@@ -4,6 +4,7 @@ set -euo pipefail
 REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
 RAW_INSTALLER_URL="https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh"
 DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
+STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/local-coding-ai"
 INSTALL_DIR="${LOCAL_AI_INSTALL_DIR:-${DEFAULT_INSTALL_DIR}}"
 PROJECT_DIR="${AIDER_PROJECT_DIR:-${PWD}}"
 GENERAL_MODEL="${LOCAL_AI_GENERAL_MODEL:-}"
@@ -19,6 +20,82 @@ GPU_VRAM_MB=0
 SYSTEM_RAM_MB=0
 REQUIRED_DISK_GB=0
 SCRIPT_ROOT=""
+USER_BIN_WAS_ON_PATH=false
+case ":${PATH}:" in
+  *":${HOME}/.local/bin:"*) USER_BIN_WAS_ON_PATH=true ;;
+esac
+
+state_mark() {
+  mkdir -p "${STATE_DIR}"
+  touch "${STATE_DIR}/$1"
+}
+
+state_append_unique() {
+  local file="${STATE_DIR}/$1"
+  local value="$2"
+
+  mkdir -p "${STATE_DIR}"
+  touch "${file}"
+  grep -Fqx -- "${value}" "${file}" || printf '%s\n' "${value}" >>"${file}"
+}
+
+init_install_state() {
+  local recorded_install_dir
+
+  mkdir -p "${STATE_DIR}"
+  chmod 0700 "${STATE_DIR}"
+  if [[ -r "${STATE_DIR}/install-dir" ]]; then
+    IFS= read -r recorded_install_dir <"${STATE_DIR}/install-dir"
+    if [[ "$(realpath -m "${recorded_install_dir}")" != "$(realpath -m "${INSTALL_DIR}")" ]]; then
+      fail "já existe uma instalação registrada em ${recorded_install_dir}; desinstale-a antes de usar outro --install-dir"
+    fi
+  fi
+  printf '1\n' >"${STATE_DIR}/format-version"
+  printf '%s\n' "${INSTALL_DIR}" >"${STATE_DIR}/install-dir"
+}
+
+record_new_apt_packages() {
+  local before_file="$1"
+  local after_file
+  local package
+
+  after_file="$(mktemp)"
+  dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' 2>/dev/null \
+    | awk '$1 ~ /^ii/ { print $2 }' | sort -u >"${after_file}"
+  while IFS= read -r package; do
+    [[ -n "${package}" ]] && state_append_unique apt-packages "${package}"
+  done < <(comm -13 "${before_file}" "${after_file}")
+  rm -f "${after_file}"
+}
+
+backup_system_file_once() {
+  local source_file="$1"
+  local state_name="$2"
+  local metadata="${STATE_DIR}/system-${state_name}.recorded"
+
+  [[ ! -e "${metadata}" ]] || return 0
+  if sudo test -e "${source_file}"; then
+    sudo cp -a "${source_file}" "${STATE_DIR}/system-${state_name}.backup"
+    state_mark "system-${state_name}.existed"
+  else
+    state_mark "system-${state_name}.absent"
+  fi
+  state_mark "system-${state_name}.recorded"
+}
+
+backup_user_file_once() {
+  local source_file="$1"
+  local state_name="$2"
+
+  [[ ! -e "${STATE_DIR}/${state_name}.recorded" ]] || return 0
+  if [[ -e "${source_file}" ]]; then
+    cp -a "${source_file}" "${STATE_DIR}/${state_name}.backup"
+    state_mark "${state_name}.existed"
+  else
+    state_mark "${state_name}.absent"
+  fi
+  state_mark "${state_name}.recorded"
+}
 
 info() {
   printf '\n==> %s\n' "$*"
@@ -234,6 +311,7 @@ collect_missing_packages() {
   command -v python3 >/dev/null 2>&1 || result_ref+=(python3)
   command -v pipx >/dev/null 2>&1 || result_ref+=(pipx)
   command -v mkcert >/dev/null 2>&1 || result_ref+=(mkcert)
+  command -v openssl >/dev/null 2>&1 || result_ref+=(openssl)
   command -v gpg >/dev/null 2>&1 || result_ref+=(gpg)
   command -v certutil >/dev/null 2>&1 || result_ref+=(libnss3-tools)
 }
@@ -314,6 +392,8 @@ show_preflight() {
 
 install_base_packages() {
   local missing_packages=("$@")
+  local package
+  local packages_before
 
   [[ ${#missing_packages[@]} -gt 0 ]] || return 0
   command -v apt-get >/dev/null 2>&1 \
@@ -323,16 +403,28 @@ install_base_packages() {
   confirm "Instalar os pacotes ausentes: ${missing_packages[*]}?" \
     || fail "instalação cancelada"
 
+  packages_before="$(mktemp)"
+  dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' 2>/dev/null \
+    | awk '$1 ~ /^ii/ { print $2 }' | sort -u >"${packages_before}"
+  for package in "${missing_packages[@]}"; do
+    state_append_unique apt-packages "${package}"
+  done
   sudo apt-get update
   sudo apt-get install -y "${missing_packages[@]}"
+  record_new_apt_packages "${packages_before}"
+  rm -f "${packages_before}"
 }
 
 test_or_configure_gpu() {
   local docker_os
+  local packages_before
 
   [[ "${GPU_AVAILABLE}" == true ]] || return 0
 
   info "Validando acesso da GPU pelo Docker"
+  if ! docker image inspect ubuntu:24.04 >/dev/null 2>&1; then
+    state_append_unique docker-images ubuntu:24.04
+  fi
   if docker run --rm --gpus all ubuntu:24.04 nvidia-smi >/dev/null 2>&1; then
     success "Docker acessa a GPU NVIDIA"
     return 0
@@ -350,8 +442,17 @@ test_or_configure_gpu() {
   confirm "Instalar e configurar o NVIDIA Container Toolkit?" \
     || fail "a GPU não pode ser habilitada sem o NVIDIA Container Toolkit"
 
+  backup_system_file_once /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg nvidia-keyring
+  backup_system_file_once /etc/apt/sources.list.d/nvidia-container-toolkit.list nvidia-list
+  backup_system_file_once /etc/docker/daemon.json docker-daemon
+
   local key_file
   key_file="$(mktemp)"
+
+  packages_before="$(mktemp)"
+  dpkg-query -W -f='${db:Status-Abbrev} ${binary:Package}\n' 2>/dev/null \
+    | awk '$1 ~ /^ii/ { print $2 }' | sort -u >"${packages_before}"
+  state_append_unique apt-packages nvidia-container-toolkit
 
   curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
     | gpg --dearmor >"${key_file}"
@@ -362,6 +463,9 @@ test_or_configure_gpu() {
   sudo apt-get update
   sudo apt-get install -y nvidia-container-toolkit
   sudo nvidia-ctk runtime configure --runtime=docker
+  record_new_apt_packages "${packages_before}"
+  rm -f "${packages_before}"
+  state_mark nvidia-runtime-configured
   rm -f "${key_file}"
 
   if command -v systemctl >/dev/null 2>&1 && systemctl is-active docker >/dev/null 2>&1; then
@@ -387,13 +491,18 @@ prepare_repository() {
       fail "o checkout em ${INSTALL_DIR} possui alterações locais; revise-as antes de atualizar"
     fi
     info "Atualizando checkout existente"
+    if [[ ! -e "${STATE_DIR}/checkout-previous-head" ]]; then
+      git -C "${INSTALL_DIR}" rev-parse HEAD >"${STATE_DIR}/checkout-previous-head"
+    fi
     git -C "${INSTALL_DIR}" pull --ff-only
+    git -C "${INSTALL_DIR}" rev-parse HEAD >"${STATE_DIR}/checkout-installed-head"
   elif [[ -e "${INSTALL_DIR}" ]]; then
     fail "${INSTALL_DIR} já existe, mas não é um checkout deste projeto"
   else
     info "Clonando local-coding-ai"
     mkdir -p "$(dirname "${INSTALL_DIR}")"
     git clone --depth 1 "${REPOSITORY_URL}" "${INSTALL_DIR}"
+    state_mark checkout-created
   fi
 }
 
@@ -412,6 +521,7 @@ set_env_value() {
 configure_environment() {
   local env_file="${INSTALL_DIR}/.env"
 
+  backup_user_file_once "${env_file}" environment
   if [[ ! -f "${env_file}" ]]; then
     cp "${INSTALL_DIR}/.env.example" "${env_file}"
   fi
@@ -430,32 +540,80 @@ configure_environment() {
 
 install_ai_command() {
   local config_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/local-coding-ai"
+  local stack_dir_file="${config_dir}/stack-dir"
 
   mkdir -p "${HOME}/.local/bin" "${config_dir}"
+  printf '%s\n' "${AI_COMMAND_PATH}" >"${STATE_DIR}/launcher-path"
+  printf '%s\n' "${stack_dir_file}" >"${STATE_DIR}/stack-dir-config-path"
+  backup_user_file_once "${AI_COMMAND_PATH}" launcher
+  backup_user_file_once "${stack_dir_file}" stack-dir-config
   install -m 0755 "${INSTALL_DIR}/bin/ai.localhost" "${AI_COMMAND_PATH}"
-  printf '%s\n' "${INSTALL_DIR}" >"${config_dir}/stack-dir"
+  printf '%s\n' "${INSTALL_DIR}" >"${stack_dir_file}"
   export PATH="${HOME}/.local/bin:${PATH}"
+  ensure_user_bin_path
   success "comando ai.localhost instalado em ${AI_COMMAND_PATH}"
+}
+
+ensure_user_bin_path() {
+  local shell_config
+  local marker_start="# >>> local-coding-ai PATH >>>"
+
+  [[ "${USER_BIN_WAS_ON_PATH}" == false ]] || return 0
+
+  case "$(basename "${SHELL:-bash}")" in
+    zsh) shell_config="${HOME}/.zshrc" ;;
+    *) shell_config="${HOME}/.bashrc" ;;
+  esac
+
+  if [[ -f "${shell_config}" ]] && grep -Fqx "${marker_start}" "${shell_config}"; then
+    return 0
+  fi
+  if [[ ! -e "${shell_config}" ]]; then
+    state_append_unique path-created-files "${shell_config}"
+  fi
+  {
+    printf '\n%s\n' "${marker_start}"
+    printf '%s\n' 'export PATH="$HOME/.local/bin:$PATH"'
+    printf '%s\n' '# <<< local-coding-ai PATH <<<'
+  } >>"${shell_config}"
+  state_append_unique path-files "${shell_config}"
 }
 
 install_aider() {
   info "Instalando Aider no ambiente do usuário"
-  pipx ensurepath >/dev/null
   export PATH="${HOME}/.local/bin:${PATH}"
 
   if command -v aider >/dev/null 2>&1; then
     success "Aider já está instalado; preservando a instalação atual"
   else
+    [[ -e "${HOME}/.local/share/pipx" ]] || state_mark pipx-share-created
+    [[ -e "${HOME}/.local/pipx" ]] || state_mark pipx-legacy-home-created
+    [[ -e "${HOME}/.cache/pipx" ]] || state_mark pipx-cache-created
+    [[ -e "${HOME}/.local/state/pipx" ]] || state_mark pipx-state-created
     pipx install aider-chat
+    state_mark aider-installed
   fi
 
   command -v aider >/dev/null 2>&1 || fail "Aider foi instalado, mas não foi encontrado no PATH"
   success "$(aider --version | head -n 1)"
 }
 
+record_compose_images() {
+  local image
+
+  while IFS= read -r image; do
+    [[ -n "${image}" ]] || continue
+    if ! docker image inspect "${image}" >/dev/null 2>&1; then
+      state_append_unique docker-images "${image}"
+    fi
+  done < <(docker compose -f "${INSTALL_DIR}/docker-compose.yml" config --images | sort -u)
+}
+
 configure_https() {
   info "Configurando certificado HTTPS local"
-  make -C "${INSTALL_DIR}" setup-https
+  backup_user_file_once "${INSTALL_DIR}/certs/local-ai.pem" certificate
+  backup_user_file_once "${INSTALL_DIR}/certs/local-ai-key.pem" certificate-key
+  STATE_DIR="${STATE_DIR}" make -C "${INSTALL_DIR}" setup-https
 }
 
 start_stack() {
@@ -542,6 +700,12 @@ Comandos úteis:
   Parar o ambiente:
     make -C "${INSTALL_DIR}" down
 
+  Simular a desinstalação completa:
+    curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh | bash -s -- --dry-run
+
+  Desinstalar completamente:
+    curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh | bash
+
 O Aider será aberto somente dentro de um repositório Git escolhido por você.
 ============================================================
 EOF
@@ -616,6 +780,7 @@ main() {
     exit 0
   fi
 
+  init_install_state
   install_base_packages "${missing_packages[@]}"
   check_docker
   check_required_ports
@@ -629,6 +794,7 @@ main() {
   prepare_repository
   configure_environment
   install_aider
+  record_compose_images
   configure_https
   start_stack
   download_models

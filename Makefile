@@ -3,6 +3,7 @@ SHELL := /usr/bin/env bash
 COMPOSE ?= docker compose
 COMPOSE_GPU ?= $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
 ENV_FILE ?= .env
+STATE_DIR ?=
 MODEL ?=
 
 .PHONY: up up-gpu up-web-search up-gpu-web-search down restart restart-gpu setup-https logs logs-web-search logs-proxy ps pull-model run-model models test-ollama test-open-webui test-searxng shell-ollama update-images
@@ -29,7 +30,7 @@ restart-gpu:
 	$(COMPOSE_GPU) restart
 
 setup-https:
-	ENV_FILE="$(ENV_FILE)" scripts/setup-local-https.sh
+	ENV_FILE="$(ENV_FILE)" STATE_DIR="$(STATE_DIR)" scripts/setup-local-https.sh
 	$(COMPOSE) up -d --no-deps --force-recreate reverse-proxy
 
 logs:

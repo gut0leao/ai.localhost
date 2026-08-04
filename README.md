@@ -73,7 +73,7 @@ Host/WSL: Aider e o comando ai.localhost
 - Docker Compose v2.
 - RAM recomendada: 16 GB para começar, 32 GB para modelos maiores.
 
-O instalador automatizado instala, quando necessário, `curl`, Git, `make`, Python, `pipx`, `mkcert` e ferramentas NSS em distribuições com `apt`. O Docker e o Compose devem estar previamente instalados porque a escolha entre Docker Engine e Docker Desktop depende da máquina. Na instalação manual, todas essas ferramentas são pré-requisitos.
+O instalador automatizado instala, quando necessário, `curl`, Git, `make`, Python, `pipx`, `mkcert`, OpenSSL e ferramentas NSS em distribuições com `apt`. O Docker e o Compose devem estar previamente instalados porque a escolha entre Docker Engine e Docker Desktop depende da máquina. Na instalação manual, todas essas ferramentas são pré-requisitos.
 
 No WSL2, mantenha seus projetos dentro do filesystem Linux, por exemplo `~/workspace/projeto`, em vez de `/mnt/c/...`.
 
@@ -113,6 +113,8 @@ Antes de baixar imagens ou modelos, o instalador verifica Linux/WSL2, RAM, VRAM,
 - mostra URLs e comandos de gerenciamento antes de abrir o Aider com o Qwen geral mais recente compatível no repositório atual; o modelo especializado em código permanece disponível como alternativa;
 - instala o comando global `ai.localhost`, que elimina a necessidade de exportar `OLLAMA_API_BASE` ou repetir o nome do modelo.
 
+Durante a execução, o instalador mantém um manifesto em `~/.local/state/local-coding-ai`. Ele registra o que já existia e o que foi adicionado pelo projeto para permitir uma desinstalação completa sem remover ferramentas compartilhadas que já estavam na máquina.
+
 A seleção automática prioriza a geração Qwen mais recente que caiba de maneira razoável na RAM/VRAM detectada. Atualmente, ela usa Qwen 3.6 em máquinas grandes, Qwen 3.5 nos demais perfis e Qwen3-Coder ou Qwen2.5-Coder para programação. As famílias e tamanhos podem ser conferidos no catálogo oficial do [Qwen 3.6](https://ollama.com/library/qwen3.6), [Qwen 3.5](https://ollama.com/library/qwen3.5) e [Qwen3-Coder](https://ollama.com/library/qwen3-coder).
 
 Faça somente o diagnóstico, sem alterações ou downloads:
@@ -146,6 +148,52 @@ curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/insta
 less /tmp/local-coding-ai-install.sh
 bash /tmp/local-coding-ai-install.sh
 ```
+
+## Desinstalação Completa
+
+> **Atenção:** a desinstalação apaga definitivamente os modelos baixados, as conversas do Open WebUI e os demais dados armazenados nos volumes Docker.
+
+Confira primeiro o que seria removido, sem alterar a máquina:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh \
+  | bash -s -- --dry-run
+```
+
+Em um checkout local, os comandos equivalentes são:
+
+```bash
+./uninstall.sh --dry-run
+./uninstall.sh
+```
+
+Execute a desinstalação completa:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh | bash
+```
+
+Para uso não interativo:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh \
+  | bash -s -- --yes
+```
+
+O desinstalador usa o manifesto para:
+
+- remover containers, rede, volumes, modelos, conversas e imagens baixadas pelo instalador;
+- remover o certificado de `ai.localhost` e desfazer a confiança da CA do `mkcert` quando ela foi criada pelo projeto, inclusive no armazenamento do usuário Windows quando configurado pelo WSL;
+- desinstalar o Aider com `pipx` somente se ele não existia antes;
+- remover `ai.localhost` e restaurar qualquer launcher ou configuração anterior;
+- remover somente os pacotes APT que não estavam instalados antes;
+- restaurar `/etc/docker/daemon.json` e os arquivos do repositório NVIDIA quando o instalador os alterou;
+- restaurar o `.env`, certificados e revisão Git anteriores quando a stack já existia;
+- apagar o checkout em `~/.local/share/local-coding-ai` somente quando ele foi clonado pelo instalador.
+
+O Docker, o Docker Compose, o driver NVIDIA e o próprio WSL não são removidos, pois são pré-requisitos e não são instalados pelo projeto. Em instalações antigas que não possuem manifesto, o script remove os recursos próprios da stack, mas preserva Aider, CA, pacotes APT e configuração NVIDIA por não conseguir determinar com segurança sua origem.
+
+Depois da desinstalação, abra um novo terminal antes de testar novamente o instalador.
 
 ## Instalação Manual
 
