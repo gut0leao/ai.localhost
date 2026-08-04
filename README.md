@@ -168,7 +168,9 @@ Revise as variáveis, especialmente portas e modelo padrão:
 sed -n '1,120p' .env
 ```
 
-## Primeiro Uso
+## Primeiro Uso após Instalação Manual
+
+Esta seção se aplica somente a quem clonou e configurou o projeto manualmente. Se você utilizou o instalador automatizado, o HTTPS, a stack e os modelos já foram preparados; entre em um repositório Git e execute `ai.localhost`.
 
 Configure o certificado HTTPS local:
 
