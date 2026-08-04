@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
-RAW_INSTALLER_URL="https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh"
+REPOSITORY_URL="https://github.com/gut0leao/ai.localhost.git"
+LEGACY_REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
+RAW_INSTALLER_URL="https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh"
 DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
 STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/local-coding-ai"
 INSTALL_DIR="${LOCAL_AI_INSTALL_DIR:-${DEFAULT_INSTALL_DIR}}"
@@ -116,7 +117,7 @@ fail() {
 
 usage() {
   cat <<EOF
-Instalador do local-coding-ai
+Instalador do ai.localhost
 
 Uso local:
   ./install.sh [opções]
@@ -324,7 +325,7 @@ check_docker() {
 
 check_network() {
   curl --fail --silent --show-error --head --max-time 15 \
-    https://github.com/gut0leao/local-coding-ai >/dev/null \
+    https://github.com/gut0leao/ai.localhost >/dev/null \
     || fail "não foi possível acessar o repositório no GitHub"
   curl --fail --silent --show-error --head --max-time 15 \
     https://ollama.com >/dev/null \
@@ -487,6 +488,10 @@ prepare_repository() {
   fi
 
   if [[ -d "${INSTALL_DIR}/.git" ]]; then
+    case "$(git -C "${INSTALL_DIR}" remote get-url origin 2>/dev/null || true)" in
+      "${REPOSITORY_URL}"|"${LEGACY_REPOSITORY_URL}"|git@github.com:gut0leao/ai.localhost.git|git@github.com:gut0leao/local-coding-ai.git) ;;
+      *) fail "o checkout em ${INSTALL_DIR} não pertence ao projeto ai.localhost" ;;
+    esac
     if [[ -n "$(git -C "${INSTALL_DIR}" status --porcelain)" ]]; then
       fail "o checkout em ${INSTALL_DIR} possui alterações locais; revise-as antes de atualizar"
     fi
@@ -499,7 +504,7 @@ prepare_repository() {
   elif [[ -e "${INSTALL_DIR}" ]]; then
     fail "${INSTALL_DIR} já existe, mas não é um checkout deste projeto"
   else
-    info "Clonando local-coding-ai"
+    info "Clonando ai.localhost"
     mkdir -p "$(dirname "${INSTALL_DIR}")"
     git clone --depth 1 "${REPOSITORY_URL}" "${INSTALL_DIR}"
     state_mark checkout-created
@@ -701,10 +706,10 @@ Comandos úteis:
     make -C "${INSTALL_DIR}" down
 
   Simular a desinstalação completa:
-    curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh | bash -s -- --dry-run
+    curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh | bash -s -- --dry-run
 
   Desinstalar completamente:
-    curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh | bash
+    curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh | bash
 
 O Aider será aberto somente dentro de um repositório Git escolhido por você.
 ============================================================

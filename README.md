@@ -1,8 +1,10 @@
-# local-coding-ai
+# ai.localhost
 
 Ambiente local, privado e reproduzível de IA para desenvolvimento com código usando Docker Compose, Ollama e Open WebUI.
 
 O objetivo é rodar modelos locais para apoio a desenvolvimento sem depender de APIs externas, mantendo os dados no host/WSL e expondo os serviços apenas em `localhost`.
+
+O repositório e a interface usam o nome `ai.localhost`. Os diretórios internos, o manifesto e os volumes preservam o identificador histórico `local-coding-ai` para que instalações existentes continuem funcionando após a mudança de nome.
 
 ## Visão Geral
 
@@ -83,7 +85,7 @@ O instalador pode ser executado diretamente do GitHub. Inicie o comando dentro d
 
 ```bash
 cd ~/workspace/meu-projeto
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh | bash
 ```
 
 Esse comando remoto é necessário apenas uma vez para preparar a máquina. Ao final, ele instala o executável `ai.localhost` em `~/.local/bin`. A partir daí, o uso diário em qualquer repositório Git requer somente:
@@ -97,7 +99,7 @@ O diretório em que o instalador é executado não limita a instalação. Você 
 
 ```bash
 cd ~
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
   | bash -s -- --no-launch
 ```
 
@@ -120,21 +122,21 @@ A seleção automática prioriza a geração Qwen mais recente que caiba de mane
 Faça somente o diagnóstico, sem alterações ou downloads:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
   | bash -s -- --check-only
 ```
 
 Instale sem abrir o Aider ao final:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
   | bash -s -- --no-launch
 ```
 
 É possível substituir a seleção automática:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
   | bash -s -- \
       --general-model qwen3.5:9b \
       --code-model qwen2.5-coder:7b \
@@ -144,9 +146,9 @@ curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/insta
 Para revisar o instalador antes de executá-lo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh -o /tmp/local-coding-ai-install.sh
-less /tmp/local-coding-ai-install.sh
-bash /tmp/local-coding-ai-install.sh
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh -o /tmp/ai-localhost-install.sh
+less /tmp/ai-localhost-install.sh
+bash /tmp/ai-localhost-install.sh
 ```
 
 ## Desinstalação Completa
@@ -156,7 +158,7 @@ bash /tmp/local-coding-ai-install.sh
 Confira primeiro o que seria removido, sem alterar a máquina:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh \
   | bash -s -- --dry-run
 ```
 
@@ -170,13 +172,13 @@ Em um checkout local, os comandos equivalentes são:
 Execute a desinstalação completa:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh | bash
 ```
 
 Para uso não interativo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh \
   | bash -s -- --yes
 ```
 
@@ -200,8 +202,8 @@ Depois da desinstalação, abra um novo terminal antes de testar novamente o ins
 Clone o repositório e entre na pasta:
 
 ```bash
-git clone https://github.com/gut0leao/local-coding-ai.git
-cd local-coding-ai
+git clone https://github.com/gut0leao/ai.localhost.git
+cd ai.localhost
 ```
 
 Crie o arquivo de configuração local:

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
-RAW_UNINSTALLER_URL="https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/uninstall.sh"
+REPOSITORY_URL="https://github.com/gut0leao/ai.localhost.git"
+LEGACY_REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
+RAW_UNINSTALLER_URL="https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh"
 DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
 STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/local-coding-ai"
 INSTALL_DIR="${LOCAL_AI_INSTALL_DIR:-}"
@@ -33,7 +34,7 @@ fail() {
 
 usage() {
   cat <<EOF
-Desinstalador completo do local-coding-ai
+Desinstalador completo do ai.localhost
 
 Uso local:
   ./uninstall.sh [opções]
@@ -122,11 +123,13 @@ detect_locations() {
     || fail "diretório de instalação inseguro: ${INSTALL_DIR}"
 
   if [[ "${HAS_STATE}" == true && -e "${STATE_DIR}/checkout-created" ]]; then
-    if [[ -d "${INSTALL_DIR}/.git" ]] \
-      && [[ "$(git -C "${INSTALL_DIR}" remote get-url origin 2>/dev/null || true)" == "${REPOSITORY_URL}" ]]; then
-      REMOVE_CHECKOUT=true
+    if [[ -d "${INSTALL_DIR}/.git" ]]; then
+      case "$(git -C "${INSTALL_DIR}" remote get-url origin 2>/dev/null || true)" in
+        "${REPOSITORY_URL}"|"${LEGACY_REPOSITORY_URL}"|git@github.com:gut0leao/ai.localhost.git|git@github.com:gut0leao/local-coding-ai.git) REMOVE_CHECKOUT=true ;;
+        *) fail "o manifesto pede a remoção do checkout, mas ${INSTALL_DIR} não corresponde ao repositório esperado" ;;
+      esac
     else
-      fail "o manifesto pede a remoção do checkout, mas ${INSTALL_DIR} não corresponde ao repositório esperado"
+      fail "o manifesto pede a remoção do checkout, mas ${INSTALL_DIR} não é um repositório Git"
     fi
   fi
 }
@@ -135,7 +138,7 @@ show_plan() {
   cat <<EOF
 
 ============================================================
-Desinstalação completa do local-coding-ai
+Desinstalação completa do ai.localhost
 ============================================================
 Stack:      ${INSTALL_DIR}
 Manifesto: ${STATE_DIR}
@@ -431,7 +434,7 @@ main() {
   restart_docker_if_needed
   remove_checkout_and_state
 
-  success "local-coding-ai foi desinstalado"
+  success "ai.localhost foi desinstalado"
   printf 'Abra um novo terminal para recarregar o PATH.\n'
 }
 
