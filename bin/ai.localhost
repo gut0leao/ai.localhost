@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEFAULT_STACK_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
+CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/local-coding-ai"
+STACK_DIR_FILE="${CONFIG_DIR}/stack-dir"
+STACK_DIR="${LOCAL_AI_INSTALL_DIR:-}"
+PROJECT_DIR="${PWD}"
+USE_CODE_MODEL=false
+START_STACK=true
+MODEL_OVERRIDE=""
+AIDER_ARGS=()
+
+fail() {
+  printf 'Erro: %s\n' "$*" >&2
+  exit 1
+}
+
+usage() {
+  cat <<'EOF'
+Assistente local de programação
+
+Uso:
+  ai.localhost [opções do Aider]
+  ai.localhost --project /caminho/do/repositorio [opções do Aider]
+
+Opções do ambiente:
+  --code             Usa o modelo especializado em código.
+  --project CAMINHO  Abre o Aider nesse repositório Git.
+  --no-start         Não tenta iniciar a stack antes de abrir o Aider.
+  -h, --help         Exibe esta ajuda.
+
+Todas as demais opções são encaminhadas ao Aider. Por exemplo:
+  ai.localhost --message "explique este projeto"
+  ai.localhost --model ollama_chat/outro-modelo
+EOF
+}
+
+show_startup_guide() {
+  local model="$1"
+
+  cat <<EOF
+Ambiente local de IA
+  Interface web: https://ai.localhost
+  Projeto:       ${PROJECT_DIR}
+  Modelo:        ${model}
+
+Atalhos úteis
+  Modelo de código:  ai.localhost --code
+  Escolher modelo:   ai.localhost --model ollama_chat/<modelo>
+  Baixar modelo:     make -C "${STACK_DIR}" pull-model MODEL=<modelo>
+  Outro projeto:     ai.localhost --project /caminho/do/projeto
+  Todas as opções:   ai.localhost --help
+
+Abrindo o Aider...
+
+EOF
+}
+
+env_value() {
+  local key="$1"
+  local env_file="${STACK_DIR}/.env"
+
+  awk -F= -v key="${key}" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "${env_file}"
+}
+
+resolve_stack_dir() {
+  local script_path
+  local repository_root
+
+  if [[ -n "${STACK_DIR}" ]]; then
+    return 0
+  fi
+
+  script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+  repository_root="$(cd "$(dirname "${script_path}")/.." && pwd)"
+  if [[ -f "${repository_root}/docker-compose.yml" ]]; then
+    STACK_DIR="${repository_root}"
+  elif [[ -r "${STACK_DIR_FILE}" ]]; then
+    IFS= read -r STACK_DIR <"${STACK_DIR_FILE}"
+  else
+    STACK_DIR="${DEFAULT_STACK_DIR}"
+  fi
+}
+
+parse_args() {
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --code)
+        USE_CODE_MODEL=true
+        ;;
+      --project)
+        [[ $# -ge 2 ]] || fail "--project requer um caminho"
+        PROJECT_DIR="$2"
+        shift
+        ;;
+      --no-start)
+        START_STACK=false
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      --model)
+        [[ $# -ge 2 ]] || fail "--model requer um modelo"
+        MODEL_OVERRIDE="$2"
+        shift
+        ;;
+      --model=*)
+        MODEL_OVERRIDE="${1#--model=}"
+        ;;
+      *)
+        AIDER_ARGS+=("$1")
+        ;;
+    esac
+    shift
+  done
+}
+
+start_stack() {
+  local attempt
+  local runtime
+
+  [[ "${START_STACK}" == true ]] || return 0
+  runtime="$(env_value LOCAL_AI_RUNTIME)"
+  if [[ -z "${runtime}" ]] && command -v nvidia-smi >/dev/null 2>&1 \
+    && nvidia-smi >/dev/null 2>&1; then
+    runtime="gpu"
+  fi
+  if make -C "${STACK_DIR}" test-ollama >/dev/null 2>&1 \
+    && make -C "${STACK_DIR}" test-open-webui >/dev/null 2>&1 \
+    && { [[ "${runtime}" != "gpu" ]] \
+      || docker inspect ai-ollama --format '{{json .HostConfig.DeviceRequests}}' 2>/dev/null \
+        | grep -q 'nvidia'; }; then
+    return 0
+  fi
+
+  printf 'Iniciando ambiente local de IA (%s)...\n' "${runtime:-cpu}"
+  if [[ "${runtime}" == "gpu" ]]; then
+    make -C "${STACK_DIR}" up-gpu
+  else
+    make -C "${STACK_DIR}" up
+  fi
+
+  for attempt in $(seq 1 30); do
+    if make -C "${STACK_DIR}" test-ollama >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  fail "Ollama não respondeu; consulte: make -C ${STACK_DIR} logs"
+}
+
+main() {
+  local model
+  local ollama_port
+
+  parse_args "$@"
+  resolve_stack_dir
+
+  [[ -f "${STACK_DIR}/docker-compose.yml" && -f "${STACK_DIR}/.env" ]] \
+    || fail "ambiente não instalado em ${STACK_DIR}; execute primeiro o instalador"
+  command -v make >/dev/null 2>&1 || fail "make não está instalado"
+  command -v docker >/dev/null 2>&1 || fail "Docker não está instalado"
+  command -v git >/dev/null 2>&1 || fail "Git não está instalado"
+  command -v aider >/dev/null 2>&1 || fail "Aider não está instalado"
+  [[ -d "${PROJECT_DIR}" ]] || fail "diretório não encontrado: ${PROJECT_DIR}"
+  git -C "${PROJECT_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+    || fail "${PROJECT_DIR} não é um repositório Git; entre em um projeto ou use --project"
+
+  PROJECT_DIR="$(cd "${PROJECT_DIR}" && pwd)"
+  start_stack
+
+  if [[ -n "${MODEL_OVERRIDE}" ]]; then
+    model="${MODEL_OVERRIDE}"
+  elif [[ "${USE_CODE_MODEL}" == true ]]; then
+    model="$(env_value OLLAMA_CODE_MODEL_DEFAULT)"
+    model="${model:-$(env_value OLLAMA_AIDER_MODEL_DEFAULT)}"
+  else
+    model="$(env_value OLLAMA_AIDER_MODEL_DEFAULT)"
+  fi
+  model="${model:-$(env_value OLLAMA_MODEL_DEFAULT)}"
+  [[ -n "${model}" ]] || fail "nenhum modelo foi configurado em ${STACK_DIR}/.env"
+  [[ "${model}" == */* ]] || model="ollama_chat/${model}"
+
+  ollama_port="$(env_value OLLAMA_PORT)"
+  export OLLAMA_API_BASE="http://localhost:${ollama_port:-11434}"
+
+  show_startup_guide "${model}"
+  cd "${PROJECT_DIR}"
+  exec aider --model "${model}" "${AIDER_ARGS[@]}"
+}
+
+main "$@"

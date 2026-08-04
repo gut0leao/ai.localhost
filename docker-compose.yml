@@ -14,8 +14,8 @@ services:
     restart: unless-stopped
     depends_on:
       - ollama
-    ports:
-      - "${OPEN_WEBUI_BIND_HOST:-127.0.0.1}:${OPEN_WEBUI_PORT:-3000}:8080"
+    expose:
+      - "8080"
     environment:
       OLLAMA_BASE_URL: "http://ollama:11434"
       WEBUI_AUTH: "${WEBUI_AUTH:-true}"
@@ -36,6 +36,26 @@ services:
       RAG_WEB_SEARCH_CONCURRENT_REQUESTS: "${WEB_LOADER_CONCURRENT_REQUESTS:-5}"
     volumes:
       - open-webui-data:/app/backend/data
+
+  reverse-proxy:
+    image: caddy:2-alpine
+    container_name: ai-reverse-proxy
+    restart: unless-stopped
+    depends_on:
+      - open-webui
+    environment:
+      AI_HOSTNAME: "${AI_HOSTNAME:-ai.localhost}"
+      AI_HTTPS_PORT: "${AI_HTTPS_PORT:-443}"
+    ports:
+      - "${AI_BIND_HOST:-127.0.0.1}:${AI_HTTP_PORT:-80}:80"
+      - "${AI_BIND_HOST:-127.0.0.1}:${AI_HTTPS_PORT:-443}:443"
+    entrypoint:
+      - /bin/sh
+      - /etc/caddy/start-proxy.sh
+    volumes:
+      - ./proxy/Caddyfile.https:/etc/caddy/Caddyfile.https:ro
+      - ./proxy/start-proxy.sh:/etc/caddy/start-proxy.sh:ro
+      - ./certs:/certs:ro
 
   searxng:
     image: docker.io/searxng/searxng:latest

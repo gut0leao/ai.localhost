@@ -10,9 +10,11 @@ Este projeto entrega uma stack simples para Linux/WSL2:
 
 - Ollama em container para executar LLMs localmente.
 - Open WebUI em container para interface web local.
+- Caddy como proxy reverso local para `ai.localhost`.
 - Volumes nomeados para persistir modelos e dados.
 - Bind padrão em `127.0.0.1`, sem exposição para a rede local.
 - Scripts e Makefile para operação diária.
+- Comando global `ai.localhost` para iniciar o ambiente e abrir o Aider no projeto atual.
 - Aider documentado para rodar no host/WSL, apontando para o Ollama local.
 
 ## Componentes e Fluxo
@@ -20,10 +22,12 @@ Este projeto entrega uma stack simples para Linux/WSL2:
 | Componente | Papel no ambiente |
 |---|---|
 | Docker Compose | Sobe e conecta os serviços, além de criar os volumes persistentes. Os atalhos `make` executam comandos do Compose. |
-| Ollama | Servidor local que baixa, armazena e executa os modelos de linguagem. Sua API fica disponível no host em `http://127.0.0.1:11434`. |
+| Ollama | Servidor local que baixa, armazena e executa os modelos de linguagem. Sua API fica disponível no host em `http://localhost:11434`. |
 | Modelo LLM | A IA que gera respostas. O modelo padrão é definido por `OLLAMA_MODEL_DEFAULT` no arquivo `.env`. |
-| Open WebUI | Interface web local para conversar com os modelos. Dentro da rede Docker, conecta-se ao Ollama por `http://ollama:11434`; no navegador, é acessado em `http://127.0.0.1:3000`. |
+| Open WebUI | Interface web local para conversar com os modelos. Não publica uma porta diretamente no host e conecta-se ao Ollama pela rede Docker. |
+| Caddy | Proxy reverso que publica o Open WebUI em `https://ai.localhost` e redireciona automaticamente requisições HTTP para HTTPS. |
 | Aider | Assistente de programação de terminal instalado no host/WSL. Ao ser iniciado dentro de um repositório, usa o Ollama local e pode trabalhar nos arquivos desse repositório. |
+| `ai.localhost` | Comando instalado em `~/.local/bin` que inicia a stack quando necessário, define `OLLAMA_API_BASE`, seleciona o modelo configurado e abre o Aider no projeto atual. |
 | SearXNG | Metabuscador opcional, iniciado somente com `make up-web-search`, que fornece busca web ao Open WebUI. |
 | Volumes nomeados | Preservam os modelos do Ollama, os dados do Open WebUI e o cache do SearXNG mesmo após `make down`. |
 | `.env` | Configuração local de portas, modelo padrão, autenticação e opções de busca; deve ser criado a partir de `.env.example`. |
@@ -31,11 +35,13 @@ Este projeto entrega uma stack simples para Linux/WSL2:
 Fluxo padrão, totalmente local:
 
 ```text
-Navegador / Aider / curl
-          ↓ localhost
-        Ollama
-          ↓
-    modelo local
+Navegador
+    ↓ https://ai.localhost
+Caddy → Open WebUI → Ollama → modelo local
+
+Aider / curl
+    ↓ http://localhost:11434
+Ollama → modelo local
 ```
 
 Com a busca web opcional habilitada, o Open WebUI consulta o SearXNG, que por sua vez pode fazer requisições a mecanismos e fontes externos. Sem esse modo, o ambiente não acessa a internet para responder aos prompts.
@@ -45,22 +51,19 @@ Com a busca web opcional habilitada, o Open WebUI consulta o SearXNG, que por su
 - Privacidade do código e dos prompts.
 - Execução local sem serviços cloud.
 - Reprodutibilidade em outra máquina.
-- Setup simples para CPU, com GPU NVIDIA como opção documentada.
+- Seleção automática entre CPU e GPU NVIDIA no instalador, com comandos explícitos para operação manual.
 - Evitar permissões amplas, `privileged: true`, `network_mode: host` e montagens sensíveis.
 
 ## Arquitetura
 
 ```text
 WSL2/Linux Host
-└── Docker Compose
-    ├── Ollama
-    │   └── modelos locais persistidos
-    └── Open WebUI
-        └── interface local tipo ChatGPT
+├── Navegador → Caddy → Open WebUI ┐
+├── Aider ─────────────────────────┼→ Ollama → modelo local
+└── curl ──────────────────────────┘
 
-Aider no host/WSL
-    ↓ localhost
-Ollama Container
+Docker Compose: Caddy, Open WebUI, Ollama e SearXNG opcional
+Host/WSL: Aider e o comando ai.localhost
 ```
 
 ## Pré-Requisitos
@@ -68,12 +71,83 @@ Ollama Container
 - Linux ou WSL2.
 - Docker Engine.
 - Docker Compose v2.
-- `make`, `bash` e `curl`.
 - RAM recomendada: 16 GB para começar, 32 GB para modelos maiores.
+
+O instalador automatizado instala, quando necessário, `curl`, Git, `make`, Python, `pipx`, `mkcert` e ferramentas NSS em distribuições com `apt`. O Docker e o Compose devem estar previamente instalados porque a escolha entre Docker Engine e Docker Desktop depende da máquina. Na instalação manual, todas essas ferramentas são pré-requisitos.
 
 No WSL2, mantenha seus projetos dentro do filesystem Linux, por exemplo `~/workspace/projeto`, em vez de `/mnt/c/...`.
 
-## Instalação
+## Instalação Automatizada
+
+O instalador pode ser executado diretamente do GitHub. Inicie o comando dentro do repositório em que deseja abrir o Aider:
+
+```bash
+cd ~/workspace/meu-projeto
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh | bash
+```
+
+Esse comando remoto é necessário apenas uma vez para preparar a máquina. Ao final, ele instala o executável `ai.localhost` em `~/.local/bin`. A partir daí, o uso diário em qualquer repositório Git requer somente:
+
+```bash
+cd ~/workspace/meu-projeto
+ai.localhost
+```
+
+O diretório em que o instalador é executado não limita a instalação. Você também pode instalá-lo a partir da sua pasta pessoal sem abrir o Aider imediatamente:
+
+```bash
+cd ~
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh \
+  | bash -s -- --no-launch
+```
+
+Antes de baixar imagens ou modelos, o instalador verifica Linux/WSL2, RAM, VRAM, GPU NVIDIA, espaço em disco, Docker, Compose e dependências do host. Em seguida, ele:
+
+- instala dependências básicas ausentes em sistemas com `apt` após confirmação;
+- clona ou atualiza a stack em `~/.local/share/local-coding-ai`;
+- valida ou configura o NVIDIA Container Toolkit quando há uma GPU compatível;
+- instala o Aider com `pipx`;
+- gera e instala o certificado local de `https://ai.localhost` com `mkcert`;
+- sobe a stack em CPU ou GPU;
+- escolhe e baixa um modelo Qwen geral e outro voltado a código;
+- mostra URLs e comandos de gerenciamento antes de abrir o Aider com o Qwen geral mais recente compatível no repositório atual; o modelo especializado em código permanece disponível como alternativa;
+- instala o comando global `ai.localhost`, que elimina a necessidade de exportar `OLLAMA_API_BASE` ou repetir o nome do modelo.
+
+A seleção automática prioriza a geração Qwen mais recente que caiba de maneira razoável na RAM/VRAM detectada. Atualmente, ela usa Qwen 3.6 em máquinas grandes, Qwen 3.5 nos demais perfis e Qwen3-Coder ou Qwen2.5-Coder para programação. As famílias e tamanhos podem ser conferidos no catálogo oficial do [Qwen 3.6](https://ollama.com/library/qwen3.6), [Qwen 3.5](https://ollama.com/library/qwen3.5) e [Qwen3-Coder](https://ollama.com/library/qwen3-coder).
+
+Faça somente o diagnóstico, sem alterações ou downloads:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh \
+  | bash -s -- --check-only
+```
+
+Instale sem abrir o Aider ao final:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh \
+  | bash -s -- --no-launch
+```
+
+É possível substituir a seleção automática:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh \
+  | bash -s -- \
+      --general-model qwen3.5:9b \
+      --code-model qwen2.5-coder:7b \
+      --aider-model qwen3.5:9b
+```
+
+Para revisar o instalador antes de executá-lo:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/local-coding-ai/main/install.sh -o /tmp/local-coding-ai-install.sh
+less /tmp/local-coding-ai-install.sh
+bash /tmp/local-coding-ai-install.sh
+```
+
+## Instalação Manual
 
 Clone o repositório e entre na pasta:
 
@@ -96,10 +170,24 @@ sed -n '1,120p' .env
 
 ## Primeiro Uso
 
-Suba os serviços:
+Configure o certificado HTTPS local:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y mkcert libnss3-tools
+make setup-https
+```
+
+Suba os serviços em CPU:
 
 ```bash
 make up
+```
+
+Ou, após configurar o runtime NVIDIA conforme a seção de GPU, suba-os com aceleração:
+
+```bash
+make up-gpu
 ```
 
 Baixe o modelo inicial:
@@ -117,7 +205,7 @@ make test-ollama
 Acesse o Open WebUI:
 
 ```text
-http://127.0.0.1:3000
+https://ai.localhost
 ```
 
 ## Como Subir o Ambiente
@@ -150,8 +238,11 @@ Esse comando remove os containers da stack, mas preserva os volumes nomeados com
 
 ```bash
 make update-images
-make up
+make up       # CPU
+make up-gpu   # GPU NVIDIA
 ```
+
+Execute apenas um dos dois comandos de inicialização, conforme o modo desejado.
 
 Se quiser revisar as mudanças das imagens, consulte a documentação oficial dos projetos antes de atualizar ambientes importantes.
 
@@ -160,7 +251,7 @@ Se quiser revisar as mudanças das imagens, consulte a documentação oficial do
 O modelo padrão fica em `.env`:
 
 ```env
-OLLAMA_MODEL_DEFAULT=qwen2.5-coder:7b
+OLLAMA_MODEL_DEFAULT=qwen3.5:4b
 ```
 
 Baixe o modelo padrão:
@@ -190,7 +281,7 @@ make run-model
 Ou com outro modelo:
 
 ```bash
-make run-model MODEL=qwen2.5-coder:14b
+make run-model MODEL=qwen3.5:9b
 ```
 
 ## Como Testar o Ollama
@@ -202,7 +293,7 @@ make test-ollama
 Teste manual:
 
 ```bash
-curl http://127.0.0.1:11434/api/tags
+curl http://localhost:11434/api/tags
 ```
 
 A resposta esperada é um JSON com os modelos disponíveis.
@@ -212,10 +303,48 @@ A resposta esperada é um JSON com os modelos disponíveis.
 Abra no navegador:
 
 ```text
-http://127.0.0.1:3000
+https://ai.localhost
 ```
 
-O Open WebUI usa `OLLAMA_BASE_URL=http://ollama:11434` dentro da rede do Docker Compose. No host, use `http://127.0.0.1:11434`.
+O Caddy recebe a requisição HTTPS na porta `443` e a encaminha ao Open WebUI pela rede interna do Compose. Requisições para `http://ai.localhost` na porta `80` são redirecionadas para HTTPS; a interface não é servida por HTTP. A porta `3000` não é publicada no host.
+
+O Open WebUI usa `OLLAMA_BASE_URL=http://ollama:11434` dentro da rede do Docker Compose. Para acessar diretamente a API do Ollama no host, use `http://localhost:11434`.
+
+### HTTPS local com mkcert
+
+O HTTPS é obrigatório para acessar a interface. Instale o [mkcert](https://github.com/FiloSottile/mkcert) e as ferramentas NSS no Ubuntu/WSL:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y mkcert libnss3-tools
+```
+
+Depois gere o certificado e inicie ou recrie o proxy:
+
+```bash
+make setup-https
+```
+
+Esse comando:
+
+- instala a CA local do `mkcert` no armazenamento de confiança do Linux/WSL;
+- gera um certificado para `ai.localhost`, `localhost`, `127.0.0.1` e `::1`;
+- no WSL, tenta instalar a CA no armazenamento do usuário Windows para que o navegador do host confie nela;
+- recria somente o container do proxy com HTTPS habilitado.
+
+Os certificados ficam em `certs/`, são ignorados pelo Git e devem ser gerados separadamente em cada notebook. A chave privada da CA do `mkcert` não é copiada para este projeto. Não compartilhe essa chave: quem a possui pode emitir certificados confiáveis pela máquina.
+
+Após a configuração, use:
+
+```text
+https://ai.localhost
+```
+
+Abrir `http://ai.localhost` apenas redireciona o navegador para esse endereço HTTPS. O proxy não inicia sem os certificados locais.
+
+O comando `make test-open-webui` valida tanto o redirecionamento quanto o endpoint HTTPS confiável.
+
+Se o navegador ainda exibir um alerta no WSL, reinicie-o para que recarregue o armazenamento de certificados do Windows.
 
 
 ## Busca Web Opcional com SearXNG
@@ -281,25 +410,41 @@ O comando `exec zsh -l` recarrega o shell para que o diretório de binários do 
 
 ## Como Configurar Aider para Usar Ollama Local
 
-Com o Ollama rodando via Docker Compose, use:
-
-```bash
-export OLLAMA_API_BASE=http://127.0.0.1:11434
-aider --model ollama_chat/qwen3:8b
-```
-
-Também é possível informar outro modelo instalado:
-
-```bash
-aider --model ollama_chat/qwen3:14b
-```
-
-## Exemplo de Uso do Aider em um Projeto Git
+O instalador cria o comando `ai.localhost`. Execute-o dentro de qualquer repositório Git; ele inicia a stack se necessário, define `OLLAMA_API_BASE` e abre o Aider com o modelo selecionado para a máquina:
 
 ```bash
 cd ~/workspace/meu-projeto
-git status
-aider --model ollama_chat/qwen3:8b
+ai.localhost
+```
+
+Use o modelo especializado em código baixado pelo instalador:
+
+```bash
+ai.localhost --code
+```
+
+Abra outro repositório sem trocar antes de diretório:
+
+```bash
+ai.localhost --project ~/workspace/outro-projeto
+```
+
+Para escolher manualmente qualquer modelo já baixado ou encaminhar outras opções ao Aider:
+
+```bash
+ai.localhost --model ollama_chat/qwen3.5:9b
+ai.localhost --message "explique a arquitetura deste projeto"
+```
+
+O comando é um executável real, não um alias de shell. Por isso funciona da mesma forma no Bash e no Zsh. A configuração da stack fica em `~/.config/local-coding-ai/stack-dir`, enquanto os modelos escolhidos ficam no `.env` da instalação. Execute `ai.localhost --help` para ver as opções próprias; as demais opções são encaminhadas ao Aider.
+
+Ao iniciar, o comando sempre mostra um resumo curto com a URL da interface web, projeto e modelo ativos e os comandos para usar o modelo de código, baixar ou selecionar outro modelo e abrir outro projeto. A ajuda completa permanece disponível em `ai.localhost --help`.
+
+Se a instalação foi feita manualmente, ainda é possível usar o Aider sem o comando auxiliar:
+
+```bash
+export OLLAMA_API_BASE=http://localhost:11434
+aider --model ollama_chat/qwen3.5:9b
 ```
 
 Dentro do Aider, peça mudanças pequenas e revise o diff antes de commitar.
@@ -309,6 +454,7 @@ Dentro do Aider, peça mudanças pequenas e revise o diff antes de commitar.
 Por padrão:
 
 - As portas são vinculadas a `127.0.0.1`.
+- O Open WebUI não publica sua porta interna diretamente; o acesso passa pelo proxy reverso local.
 - Nenhum serviço usa `network_mode: host`.
 - Nenhum container usa `privileged: true`.
 - Não há montagem de `/home`, `~/.ssh`, `/var/run/docker.sock` ou repositórios pessoais.
@@ -363,6 +509,38 @@ make logs
 ```
 
 Confirme que `OLLAMA_BASE_URL` está como `http://ollama:11434` no Compose.
+
+### O comando `ai.localhost` não é encontrado
+
+Confirme que `~/.local/bin` está no `PATH` e recarregue o shell:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+exec "$SHELL" -l
+```
+
+Se o arquivo ainda não existir, execute novamente o instalador. Em um checkout local atualizado:
+
+```bash
+./install.sh --no-launch
+```
+
+### A interface `ai.localhost` não abre
+
+Teste o proxy e consulte seus logs:
+
+```bash
+make test-open-webui
+make logs-proxy
+```
+
+Confira também se as portas locais `80` ou `443` já estão sendo usadas por outro serviço:
+
+```bash
+ss -ltnp | grep -E ':(80|443) '
+```
+
+Se o HTTPS falhar, execute novamente `make setup-https` e reinicie o navegador. O endereço HTTP não é um fallback sem TLS: ele depende do mesmo proxy e apenas redireciona para HTTPS.
 
 ### Ollama não responde no host
 

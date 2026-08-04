@@ -5,7 +5,7 @@ COMPOSE_GPU ?= $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
 ENV_FILE ?= .env
 MODEL ?=
 
-.PHONY: up up-gpu up-web-search up-gpu-web-search down restart restart-gpu logs logs-web-search ps pull-model run-model models test-ollama test-open-webui test-searxng shell-ollama update-images
+.PHONY: up up-gpu up-web-search up-gpu-web-search down restart restart-gpu setup-https logs logs-web-search logs-proxy ps pull-model run-model models test-ollama test-open-webui test-searxng shell-ollama update-images
 
 up:
 	$(COMPOSE) up -d
@@ -28,11 +28,18 @@ restart:
 restart-gpu:
 	$(COMPOSE_GPU) restart
 
+setup-https:
+	ENV_FILE="$(ENV_FILE)" scripts/setup-local-https.sh
+	$(COMPOSE) up -d --no-deps --force-recreate reverse-proxy
+
 logs:
 	$(COMPOSE) logs -f
 
 logs-web-search:
 	COMPOSE_PROFILES=web-search $(COMPOSE) logs -f searxng open-webui
+
+logs-proxy:
+	$(COMPOSE) logs -f reverse-proxy
 
 ps:
 	$(COMPOSE) ps

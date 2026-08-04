@@ -1,0 +1,8 @@
+http://{$AI_HOSTNAME:ai.localhost} {
+	redir {$AI_HTTPS_ORIGIN}{uri} permanent
+}
+
+https://{$AI_HOSTNAME:ai.localhost} {
+	tls /certs/local-ai.pem /certs/local-ai-key.pem
+	reverse_proxy open-webui:8080
+}
