@@ -1,10 +1,20 @@
 # ai.localhost
 
-Ambiente local, privado e reproduzível de IA para desenvolvimento com código usando Docker Compose, Ollama e Open WebUI.
+Ambiente local, privado e reproduzível de IA para conversas, análise de documentos e desenvolvimento com código usando Docker Compose, Ollama, Open WebUI e Aider.
 
-O objetivo é rodar modelos locais para apoio a desenvolvimento sem depender de APIs externas, mantendo os dados no host/WSL e expondo os serviços apenas em `localhost`.
+O objetivo do projeto é facilitar a instalação e configuração dessas ferramentas em ambiente local, para que pessoas e organizações consigam rodar modelos de linguagem na própria estação de trabalho sem montar manualmente toda a pilha de ferramentas envolvidas.
+
+Com isso, o **ai.localhost** oferece produtividade individual sem depender de APIs externas, mantendo documentos, prompts, conversas e código no host/WSL e expondo os serviços apenas em `localhost`.
 
 O repositório e a interface usam o nome `ai.localhost`. Os diretórios internos, o manifesto e os volumes preservam o identificador histórico `local-coding-ai` para que instalações existentes continuem funcionando após a mudança de nome.
+
+## Visão
+
+O **ai.localhost** transforma uma estação de trabalho Windows/Linux em um ambiente privado de inteligência artificial. Ele aproveita CPU e GPU locais para entregar uma primeira camada individual de produtividade, sem enviar dados sensíveis para provedores externos.
+
+A solução é complementar a plataformas corporativas de IA: tarefas locais, experimentações, análise de documentos e apoio ao desenvolvimento podem acontecer na própria estação; modelos maiores, integrações institucionais e governança centralizada continuam cabendo às soluções compartilhadas da organização.
+
+Leia a visão completa em [docs/VISION.md](docs/VISION.md).
 
 ## Visão Geral
 
