@@ -123,7 +123,9 @@ detect_locations() {
     || fail "diretório de instalação inseguro: ${INSTALL_DIR}"
 
   if [[ "${HAS_STATE}" == true && -e "${STATE_DIR}/checkout-created" ]]; then
-    if [[ -d "${INSTALL_DIR}/.git" ]]; then
+    if [[ ! -d "${INSTALL_DIR}" ]]; then
+      warn "o manifesto indica um checkout criado pelo instalador, mas ${INSTALL_DIR} já foi removido"
+    elif [[ -d "${INSTALL_DIR}/.git" ]]; then
       case "$(git -C "${INSTALL_DIR}" remote get-url origin 2>/dev/null || true)" in
         "${REPOSITORY_URL}"|"${LEGACY_REPOSITORY_URL}"|git@github.com:gut0leao/ai.localhost.git|git@github.com:gut0leao/local-coding-ai.git) REMOVE_CHECKOUT=true ;;
         *) fail "o manifesto pede a remoção do checkout, mas ${INSTALL_DIR} não corresponde ao repositório esperado" ;;

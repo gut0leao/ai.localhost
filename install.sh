@@ -48,7 +48,7 @@ init_install_state() {
   if [[ -r "${STATE_DIR}/install-dir" ]]; then
     IFS= read -r recorded_install_dir <"${STATE_DIR}/install-dir"
     if [[ "$(realpath -m "${recorded_install_dir}")" != "$(realpath -m "${INSTALL_DIR}")" ]]; then
-      fail "já existe uma instalação registrada em ${recorded_install_dir}; desinstale-a antes de usar outro --install-dir"
+      fail "já existe uma instalação registrada em ${recorded_install_dir} no manifesto ${STATE_DIR}; execute o desinstalador ou remova esse manifesto antes de usar outro --install-dir"
     fi
   fi
   printf '1\n' >"${STATE_DIR}/format-version"
@@ -534,6 +534,8 @@ configure_environment() {
   set_env_value "${env_file}" OLLAMA_MODEL_DEFAULT "${GENERAL_MODEL}"
   set_env_value "${env_file}" OLLAMA_CODE_MODEL_DEFAULT "${CODE_MODEL}"
   set_env_value "${env_file}" OLLAMA_AIDER_MODEL_DEFAULT "${AIDER_MODEL}"
+  set_env_value "${env_file}" LOCAL_AI_CA_BUNDLE "/etc/ssl/certs/ca-certificates.crt"
+  set_env_value "${env_file}" SEARXNG_QUERY_URL "'http://searxng:8080/search?q=<query>'"
   if [[ "${GPU_AVAILABLE}" == true ]]; then
     set_env_value "${env_file}" LOCAL_AI_RUNTIME "gpu"
   else

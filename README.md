@@ -537,12 +537,74 @@ Referência prática:
 
 - Use Docker Desktop com integração WSL2 ou Docker Engine instalado diretamente no WSL.
 - Guarde repositórios em `~/workspace`, não em `/mnt/c`.
-- Ajuste memória do WSL2 em `%UserProfile%\.wslconfig` se necessário.
-- Reinicie o WSL após mudanças de configuração:
+- Ajuste memória, CPU, swap e rede do WSL2 em `%UserProfile%\.wslconfig` quando for usar modelos locais por longos períodos.
+- Reinicie o WSL após mudanças de configuração. Em PowerShell:
 
 ```powershell
 wsl --shutdown
 ```
+
+O arquivo `.wslconfig` fica no perfil do usuário Windows, por exemplo `C:\Users\seu-usuario\.wslconfig`, e vale para todas as distribuições WSL2. Um perfil conservador para esta stack é:
+
+```ini
+[wsl2]
+# Em hosts com 32GB fisicos, 16GB e um bom ponto de partida.
+# Use 20GB a 24GB apenas se for rodar modelos maiores e o Windows tiver folga.
+memory=16GB
+
+# Normalmente use de metade ate todos os processadores logicos.
+# Em notebooks, limitar CPUs pode reduzir aquecimento e manter o host responsivo.
+processors=8
+
+# Swap ajuda quando o modelo estoura a RAM, mas fica bem mais lento.
+# Use 4GB a 8GB para modelos pequenos/medios; aumente apenas se necessario.
+swap=8GB
+
+# Mantem servicos publicados pelo WSL acessiveis no Windows via localhost.
+localhostForwarding=true
+
+# Melhor compatibilidade de DNS/firewall em WSL recente, especialmente com VPN.
+dnsTunneling=true
+firewall=true
+
+# Encerra a VM apos 60 segundos sem distribuicoes ativas.
+vmIdleTimeout=60000
+```
+
+Em Windows 11 22H2 ou superior, redes corporativas, VPNs e proxies TLS como Zscaler costumam funcionar melhor com rede espelhada e proxy herdado do Windows:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+dnsTunneling=true
+firewall=true
+autoProxy=true
+localhostForwarding=true
+
+[experimental]
+# Libera cache do WSL de volta ao Windows. Use gradual para evitar liberacoes bruscas.
+autoMemoryReclaim=gradual
+# Ajuda em alguns resolvedores corporativos quando dnsTunneling esta ativo.
+bestEffortDnsParsing=true
+```
+
+Evite copiar opções sem necessidade. `nestedVirtualization=true` só é útil se você pretende rodar outra camada de virtualização dentro do WSL; para Docker, Ollama e Aider ela normalmente não muda nada. `swapFile` só precisa ser definido quando você quer mover o VHD de swap para outro disco.
+
+Para aplicar e conferir:
+
+```powershell
+wsl --shutdown
+wsl --status
+```
+
+Dentro do WSL:
+
+```bash
+free -h
+nproc
+```
+
+Referência oficial: [configurações avançadas do WSL](https://learn.microsoft.com/windows/wsl/wsl-config) e [rede no WSL](https://learn.microsoft.com/windows/wsl/networking).
 
 ## Troubleshooting
 

@@ -152,6 +152,7 @@ start_stack() {
 }
 
 main() {
+  local local_ai_ca_bundle
   local model
   local ollama_port
 
@@ -185,10 +186,22 @@ main() {
 
   ollama_port="$(env_value OLLAMA_PORT)"
   export OLLAMA_API_BASE="http://localhost:${ollama_port:-11434}"
+  local_ai_ca_bundle="$(env_value LOCAL_AI_CA_BUNDLE)"
+  local_ai_ca_bundle="${local_ai_ca_bundle:-/etc/ssl/certs/ca-certificates.crt}"
+  if [[ -r "${local_ai_ca_bundle}" ]]; then
+    export SSL_CERT_FILE="${SSL_CERT_FILE:-${local_ai_ca_bundle}}"
+    export REQUESTS_CA_BUNDLE="${REQUESTS_CA_BUNDLE:-${local_ai_ca_bundle}}"
+    export CURL_CA_BUNDLE="${CURL_CA_BUNDLE:-${local_ai_ca_bundle}}"
+  fi
 
   show_startup_guide "${model}"
   cd "${PROJECT_DIR}"
-  exec aider --model "${model}" "${AIDER_ARGS[@]}"
+  exec aider \
+    --no-check-update \
+    --no-show-release-notes \
+    --no-browser \
+    --model "${model}" \
+    "${AIDER_ARGS[@]}"
 }
 
 main "$@"

@@ -3,9 +3,12 @@ services:
     image: ollama/ollama:latest
     container_name: ai-ollama
     restart: unless-stopped
+    environment:
+      SSL_CERT_FILE: "/etc/ssl/certs/ca-certificates.crt"
     ports:
       - "${OLLAMA_BIND_HOST:-127.0.0.1}:${OLLAMA_PORT:-11434}:11434"
     volumes:
+      - "${LOCAL_AI_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}:/etc/ssl/certs/ca-certificates.crt:ro"
       - ollama-models:/root/.ollama
 
   open-webui:
@@ -18,6 +21,9 @@ services:
       - "8080"
     environment:
       OLLAMA_BASE_URL: "http://ollama:11434"
+      SSL_CERT_FILE: "/etc/ssl/certs/ca-certificates.crt"
+      REQUESTS_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt"
+      CURL_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt"
       WEBUI_AUTH: "${WEBUI_AUTH:-true}"
       # ENABLE_PERSISTENT_CONFIG=false faz o Open WebUI honrar estas variaveis
       # mesmo quando ja existe configuracao persistida no volume.
@@ -35,6 +41,7 @@ services:
       RAG_WEB_SEARCH_RESULT_COUNT: "${WEB_SEARCH_RESULT_COUNT:-3}"
       RAG_WEB_SEARCH_CONCURRENT_REQUESTS: "${WEB_LOADER_CONCURRENT_REQUESTS:-5}"
     volumes:
+      - "${LOCAL_AI_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}:/etc/ssl/certs/ca-certificates.crt:ro"
       - open-webui-data:/app/backend/data
 
   reverse-proxy:
@@ -67,7 +74,11 @@ services:
       - "${SEARXNG_BIND_HOST:-127.0.0.1}:${SEARXNG_PORT:-8080}:8080"
     environment:
       SEARXNG_BASE_URL: "http://${SEARXNG_BIND_HOST:-127.0.0.1}:${SEARXNG_PORT:-8080}/"
+      SSL_CERT_FILE: "/etc/ssl/certs/ca-certificates.crt"
+      REQUESTS_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt"
+      CURL_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt"
     volumes:
+      - "${LOCAL_AI_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}:/etc/ssl/certs/ca-certificates.crt:ro"
       - ./searxng:/etc/searxng:rw
       - searxng-cache:/var/cache/searxng:rw
     cap_drop:
