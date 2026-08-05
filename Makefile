@@ -5,6 +5,7 @@ COMPOSE_GPU ?= $(COMPOSE) -f docker-compose.yml -f docker-compose.gpu.yml
 ENV_FILE ?= .env
 STATE_DIR ?=
 MODEL ?=
+WEB_SEARCH_ENV = COMPOSE_PROFILES=web-search ENABLE_WEB_SEARCH=true ENABLE_SEARCH_QUERY_GENERATION=false ENABLE_PERSISTENT_CONFIG=false DEFAULT_MODEL_METADATA='{"capabilities":{"web_search":true},"defaultFeatureIds":["web_search"]}'
 
 .PHONY: up up-gpu up-web-search up-gpu-web-search down restart restart-gpu setup-https logs logs-web-search logs-proxy ps pull-model run-model models test-ollama test-open-webui test-searxng shell-ollama update-images
 
@@ -15,10 +16,10 @@ up-gpu:
 	$(COMPOSE_GPU) up -d
 
 up-web-search:
-	COMPOSE_PROFILES=web-search ENABLE_WEB_SEARCH=true ENABLE_SEARCH_QUERY_GENERATION=false ENABLE_PERSISTENT_CONFIG=false DEFAULT_MODEL_METADATA='{"capabilities":{"web_search":true},"defaultFeatureIds":["web_search"]}' $(COMPOSE) up -d
+	$(WEB_SEARCH_ENV) $(COMPOSE) up -d
 
 up-gpu-web-search:
-	COMPOSE_PROFILES=web-search ENABLE_WEB_SEARCH=true ENABLE_SEARCH_QUERY_GENERATION=false ENABLE_PERSISTENT_CONFIG=false DEFAULT_MODEL_METADATA='{"capabilities":{"web_search":true},"defaultFeatureIds":["web_search"]}' $(COMPOSE_GPU) up -d
+	$(WEB_SEARCH_ENV) $(COMPOSE_GPU) up -d
 
 down:
 	$(COMPOSE) down

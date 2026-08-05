@@ -522,6 +522,7 @@ Por padrão:
 - Não há montagem de `/home`, `~/.ssh`, `/var/run/docker.sock` ou repositórios pessoais.
 - Modelos e dados ficam em volumes nomeados do Docker.
 - O Aider roda no host/WSL e conversa com o Ollama local.
+- Os scripts auxiliares leem `.env` como arquivo de configuração e ignoram linhas inválidas, sem executar comandos definidos nele.
 
 O serviço `ollama` usa o usuário padrão da imagem oficial. Isso é aceito aqui porque não há montagem de diretórios sensíveis, as portas ficam em localhost e o container não é privilegiado.
 
