@@ -78,39 +78,122 @@ Docker Compose: Caddy, Open WebUI, Ollama e SearXNG opcional
 Host/WSL: Aider e o comando ai.localhost
 ```
 
-## Pré-Requisitos
+## Comece Aqui
 
-- Linux ou WSL2.
-- Docker Engine.
-- Docker Compose v2.
-- RAM recomendada: 16 GB para começar, 32 GB para modelos maiores.
+Se você não costuma instalar ferramentas de desenvolvimento, siga esta ordem. O instalador do **ai.localhost** prepara a stack local de IA, mas ele pressupõe que WSL/Linux e Docker já estejam funcionando.
 
-O instalador automatizado instala, quando necessário, `curl`, Git, `make`, Python, `pipx`, `mkcert`, OpenSSL e ferramentas NSS em distribuições com `apt`. O Docker e o Compose devem estar previamente instalados porque a escolha entre Docker Engine e Docker Desktop depende da máquina. Na instalação manual, todas essas ferramentas são pré-requisitos.
+### 1. Prepare o sistema operacional
 
-No WSL2, mantenha seus projetos dentro do filesystem Linux, por exemplo `~/workspace/projeto`, em vez de `/mnt/c/...`.
+No Windows, use WSL2 com uma distribuição Linux, preferencialmente Ubuntu. Siga a documentação oficial da Microsoft:
+
+- [Instalar o WSL](https://learn.microsoft.com/windows/wsl/install)
+- [Comandos básicos do WSL](https://learn.microsoft.com/windows/wsl/basic-commands)
+- [Boas práticas para desenvolvimento com WSL](https://learn.microsoft.com/windows/wsl/setup/environment)
+
+Depois de instalar, abra o terminal da distribuição Linux, não o PowerShell, para executar os comandos deste projeto.
+
+Verifique se você está no Linux/WSL:
+
+```bash
+uname -a
+```
+
+No WSL2, mantenha seus projetos dentro do filesystem Linux, por exemplo `~/workspace/projeto`, em vez de `/mnt/c/...`. Isso melhora desempenho e evita problemas de permissão.
+
+### 2. Instale o Docker
+
+Você pode usar uma das opções abaixo:
+
+- **Docker Desktop com integração WSL2**, recomendado para quem está no Windows e quer a configuração mais simples: [Docker Desktop WSL 2 backend](https://docs.docker.com/desktop/features/wsl/).
+- **Docker Engine instalado diretamente no Ubuntu/WSL**, recomendado para quem prefere operar tudo dentro do Linux: [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
+
+Não misture as duas abordagens na mesma distribuição sem entender as consequências. Escolha uma, finalize a instalação e valide antes de continuar.
+
+Verifique no terminal Linux/WSL:
+
+```bash
+docker --version
+docker compose version
+docker info
+```
+
+Se `docker info` falhar por permissão, conclua a configuração pós-instalação indicada pela documentação oficial do Docker antes de executar o instalador do projeto.
+
+Referência: [Post-installation steps for Docker Engine](https://docs.docker.com/engine/install/linux-postinstall/).
+
+### 3. Confira recursos mínimos
+
+Recomendado para começar:
+
+- 16 GB de RAM disponível para o WSL/Linux.
+- Cerca de 12 GB livres para imagens Docker e modelos pequenos.
+- Acesso à internet para baixar imagens, dependências e modelos.
+- GPU NVIDIA é opcional; CPU funciona, mas será mais lenta.
+
+Confira memória e disco:
+
+```bash
+free -h
+df -h .
+```
+
+Em notebooks com 32 GB de RAM física, um limite de 16 GB para o WSL costuma ser um bom ponto de partida. Veja também a seção [Recomendações para WSL2](#recomendações-para-wsl2).
+
+Se você pretende usar GPU NVIDIA no Windows/WSL2, confirme primeiro que o driver e a integração com WSL estão corretos. Use a documentação oficial como referência:
+
+- [NVIDIA CUDA on WSL User Guide](https://docs.nvidia.com/cuda/wsl-user-guide/index.html)
+- [Docker Desktop GPU support](https://docs.docker.com/desktop/features/gpu/)
+
+### 4. Valide os requisitos básicos
+
+Execute:
+
+```bash
+command -v curl git make python3
+docker compose version
+```
+
+O instalador tenta instalar automaticamente dependências comuns como `curl`, Git, `make`, Python, `pipx`, `mkcert`, OpenSSL e ferramentas NSS em distribuições com `apt`. Docker e Compose devem estar prontos antes.
+
+### 5. Rode apenas o diagnóstico
+
+Antes de instalar de fato, execute o diagnóstico. Ele não baixa modelos nem altera a stack:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+  | bash -s -- --check-only
+```
+
+Se o diagnóstico passar, siga para a instalação automatizada.
 
 ## Instalação Automatizada
 
-O instalador pode ser executado diretamente do GitHub. Inicie o comando dentro do repositório em que deseja abrir o Aider:
+Com os pré-requisitos prontos, execute o instalador diretamente do GitHub. Para a maioria das pessoas, o caminho mais simples é instalar a stack sem abrir o Aider ao final:
 
 ```bash
-cd ~/workspace/meu-projeto
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh | bash
+cd ~
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+  | bash -s -- --no-launch
 ```
 
-Esse comando remoto é necessário apenas uma vez para preparar a máquina. Ao final, ele instala o executável `ai.localhost` em `~/.local/bin`. A partir daí, o uso diário em qualquer repositório Git requer somente:
+Esse comando remoto é necessário apenas uma vez para preparar a máquina. Ao final, a interface web deve ficar disponível em:
+
+```text
+https://ai.localhost
+```
+
+Se você é desenvolvedor e quer abrir o Aider em um repositório Git depois da instalação, entre no projeto e execute:
 
 ```bash
 cd ~/workspace/meu-projeto
 ai.localhost
 ```
 
-O diretório em que o instalador é executado não limita a instalação. Você também pode instalá-lo a partir da sua pasta pessoal sem abrir o Aider imediatamente:
+Também é possível iniciar a instalação já dentro de um repositório Git e permitir que o instalador abra o Aider no final:
 
 ```bash
-cd ~
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
-  | bash -s -- --no-launch
+cd ~/workspace/meu-projeto
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh | bash
 ```
 
 Antes de baixar imagens ou modelos, o instalador verifica Linux/WSL2, RAM, VRAM, GPU NVIDIA, espaço em disco, Docker, Compose e dependências do host. Em seguida, ele:
@@ -129,16 +212,14 @@ Durante a execução, o instalador mantém um manifesto em `~/.local/state/local
 
 A seleção automática prioriza a geração Qwen mais recente que caiba de maneira razoável na RAM/VRAM detectada. Atualmente, ela usa Qwen 3.6 em máquinas grandes, Qwen 3.5 nos demais perfis e Qwen3-Coder ou Qwen2.5-Coder para programação. As famílias e tamanhos podem ser conferidos no catálogo oficial do [Qwen 3.6](https://ollama.com/library/qwen3.6), [Qwen 3.5](https://ollama.com/library/qwen3.5) e [Qwen3-Coder](https://ollama.com/library/qwen3-coder).
 
-Faça somente o diagnóstico, sem alterações ou downloads:
+Opções úteis:
 
 ```bash
+# Diagnóstico sem alterações ou downloads.
 curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
   | bash -s -- --check-only
-```
 
-Instale sem abrir o Aider ao final:
-
-```bash
+# Instalação sem abrir o Aider ao final.
 curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
   | bash -s -- --no-launch
 ```
