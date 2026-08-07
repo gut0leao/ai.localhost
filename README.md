@@ -26,7 +26,7 @@ Este projeto entrega uma stack simples para Linux/WSL2:
 - Volumes nomeados para persistir modelos e dados.
 - Bind padrão em `127.0.0.1`, sem exposição para a rede local.
 - Scripts e Makefile para operação diária.
-- Comando global `ai.localhost` para iniciar o ambiente e abrir o Aider ou o OpenCode no projeto atual.
+- Comando global `ai.localhost` para iniciar o ambiente e abrir explicitamente Aider ou OpenCode no projeto atual.
 - Aider e OpenCode no host/WSL, apontados para o Ollama local.
 
 ## Componentes e Fluxo
@@ -39,8 +39,8 @@ Este projeto entrega uma stack simples para Linux/WSL2:
 | Open WebUI | Interface web local para conversar com os modelos. Não publica uma porta diretamente no host e conecta-se ao Ollama pela rede Docker. |
 | Caddy | Proxy reverso que publica o Open WebUI em `https://ai.localhost` e redireciona automaticamente requisições HTTP para HTTPS. |
 | Aider | Assistente de programação de terminal instalado no host/WSL. Ao ser iniciado dentro de um repositório, usa o Ollama local e pode trabalhar nos arquivos desse repositório. |
-| OpenCode | Alternativa de terminal com sessões, subagentes, comandos, skills, MCPs e hooks. É instalado no host/WSL e usa exclusivamente o Ollama local nesta configuração. |
-| `ai.localhost` | Comando instalado em `~/.local/bin` que inicia a stack quando necessário, seleciona o modelo configurado e abre o Aider (padrão) ou o OpenCode no projeto atual. |
+| OpenCode | Assistente de terminal com sessões, subagentes, comandos, skills, MCPs e hooks. É instalado no host/WSL e usa exclusivamente o Ollama local nesta configuração. |
+| `ai.localhost` | Comando instalado em `~/.local/bin` que inicia a stack quando necessário, seleciona o modelo configurado e abre Aider ou OpenCode mediante escolha explícita. |
 | SearXNG | Metabuscador opcional, iniciado somente com `make up-web-search`, que fornece busca web ao Open WebUI. |
 | Volumes nomeados | Preservam os modelos do Ollama, os dados do Open WebUI e o cache do SearXNG mesmo após `make down`. |
 | `.env` | Configuração local de portas, modelo padrão, autenticação e opções de busca; deve ser criado a partir de `.env.example`. |
@@ -169,7 +169,7 @@ Se o diagnóstico passar, siga para a instalação automatizada.
 
 ## Instalação Automatizada
 
-Com os pré-requisitos prontos, execute o instalador diretamente do GitHub. Para a maioria das pessoas, o caminho mais simples é instalar a stack sem abrir o Aider ao final:
+Com os pré-requisitos prontos, execute o instalador diretamente do GitHub. Por padrão, ele instala ambos os assistentes e não abre nenhum deles ao final:
 
 ```bash
 cd ~
@@ -183,18 +183,23 @@ Esse comando remoto é necessário apenas uma vez para preparar a máquina. Ao f
 https://ai.localhost
 ```
 
-Se você é desenvolvedor e quer abrir o Aider em um repositório Git depois da instalação, entre no projeto e execute:
+Se você é desenvolvedor, escolha o assistente ao entrar em um repositório Git:
 
 ```bash
 cd ~/workspace/meu-projeto
-ai.localhost
+ai.localhost --aider
+ai.localhost --opencode
 ```
 
-Também é possível iniciar a instalação já dentro de um repositório Git e permitir que o instalador abra o Aider no final:
+Também é possível iniciar a instalação já dentro de um repositório Git e escolher qual assistente será oferecido ao final:
 
 ```bash
 cd ~/workspace/meu-projeto
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+  | bash -s -- --launch-aider
+
+curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+  | bash -s -- --launch-opencode
 ```
 
 Antes de baixar imagens ou modelos, o instalador verifica Linux/WSL2, RAM, VRAM, GPU NVIDIA, espaço em disco, Docker, Compose e dependências do host. Em seguida, ele:
@@ -206,7 +211,7 @@ Antes de baixar imagens ou modelos, o instalador verifica Linux/WSL2, RAM, VRAM,
 - gera e instala o certificado local de `https://ai.localhost` com `mkcert`;
 - sobe a stack em CPU ou GPU;
 - escolhe e baixa um modelo Qwen geral e outro voltado a código;
-- mostra URLs e comandos de gerenciamento antes de abrir o Aider com o Qwen geral mais recente compatível no repositório atual; o OpenCode fica disponível como alternativa com o modelo especializado em código;
+- instala e valida Aider e OpenCode como assistentes de primeira classe, sem selecionar um deles como padrão;
 - instala o comando global `ai.localhost`, que elimina a necessidade de exportar `OLLAMA_API_BASE` ou repetir o nome do modelo.
 
 Durante a execução, o instalador mantém um manifesto em `~/.local/state/local-coding-ai`. Ele registra o que já existia e o que foi adicionado pelo projeto para permitir uma desinstalação completa sem remover ferramentas compartilhadas que já estavam na máquina.
@@ -220,7 +225,7 @@ Opções úteis:
 curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
   | bash -s -- --check-only
 
-# Instalação sem abrir o Aider ao final.
+# Instalação sem abrir um assistente ao final (também é o padrão).
 curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
   | bash -s -- --no-launch
 ```
@@ -232,7 +237,8 @@ curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.
   | bash -s -- \
       --general-model qwen3.5:9b \
       --code-model qwen2.5-coder:7b \
-      --aider-model qwen3.5:9b
+      --aider-model qwen3.5:9b \
+      --opencode-model qwen2.5-coder:7b
 ```
 
 Para revisar o instalador antes de executá-lo:
@@ -392,10 +398,12 @@ Se quiser revisar as mudanças das imagens, consulte a documentação oficial do
 
 ## Como Baixar Modelos
 
-O modelo padrão fica em `.env`:
+Os modelos padrão do ambiente e dos dois assistentes ficam em `.env`:
 
 ```env
 OLLAMA_MODEL_DEFAULT=qwen3.5:4b
+OLLAMA_AIDER_MODEL_DEFAULT=qwen2.5-coder:3b
+OLLAMA_OPENCODE_MODEL_DEFAULT=qwen2.5-coder:3b
 ```
 
 Baixe o modelo padrão:
@@ -538,9 +546,11 @@ make up
 
 Observação: usar SearXNG permite buscar na web sem API paga, mas ainda há tráfego de rede para motores/fontes externos consultados pelo metabuscador.
 
-## Como Instalar Aider no Host/WSL
+## Assistentes de Programação no Host/WSL
 
-O Aider não roda em container neste projeto. No Ubuntu executado pelo WSL, instale-o no host/WSL com `pipx`:
+O Aider e o OpenCode não rodam em containers neste projeto. O instalador instala e valida ambos no host/WSL: Aider com `pipx` e OpenCode no diretório do usuário. Nenhum deles é o padrão do comando `ai.localhost`; a escolha é sempre explícita.
+
+Para uma instalação manual do Aider no Ubuntu executado pelo WSL:
 
 ```bash
 sudo apt-get update
@@ -552,35 +562,32 @@ pipx install aider-chat
 
 O comando `exec zsh -l` recarrega o shell para que o diretório de binários do `pipx` entre no `PATH`. Se você usar outro shell, feche e abra um novo terminal WSL antes de executar `aider --version`.
 
-## Como Configurar Aider para Usar Ollama Local
+## Como Usar Aider e OpenCode com Ollama Local
 
-O instalador cria o comando `ai.localhost`. Execute-o dentro de qualquer repositório Git; ele inicia a stack se necessário, define `OLLAMA_API_BASE` e abre o Aider com o modelo selecionado para a máquina:
+O instalador cria o comando `ai.localhost`. Execute-o dentro de qualquer repositório Git; ele inicia a stack se necessário, define `OLLAMA_API_BASE` e abre o assistente escolhido com o modelo selecionado para a máquina:
 
 ```bash
 cd ~/workspace/meu-projeto
-ai.localhost
-```
-
-Use o modelo especializado em código baixado pelo instalador:
-
-```bash
-ai.localhost --code
+ai.localhost --aider
+ai.localhost --opencode
 ```
 
 Abra outro repositório sem trocar antes de diretório:
 
 ```bash
-ai.localhost --project ~/workspace/outro-projeto
+ai.localhost --aider --project ~/workspace/outro-projeto
+ai.localhost --opencode --project ~/workspace/outro-projeto
 ```
 
-Para escolher manualmente qualquer modelo já baixado ou encaminhar outras opções ao Aider:
+Para escolher manualmente qualquer modelo já baixado ou encaminhar outras opções ao assistente escolhido:
 
 ```bash
-ai.localhost --model ollama_chat/qwen3.5:9b
-ai.localhost --message "explique a arquitetura deste projeto"
+ai.localhost --aider --model ollama_chat/qwen3.5:9b
+ai.localhost --opencode --model ollama/qwen2.5-coder:7b
+ai.localhost --aider --message "explique a arquitetura deste projeto"
 ```
 
-O comando é um executável real, não um alias de shell. Por isso funciona da mesma forma no Bash e no Zsh. A configuração da stack fica em `~/.config/local-coding-ai/stack-dir`, enquanto os modelos escolhidos ficam no `.env` da instalação. Execute `ai.localhost --help` para ver as opções próprias; as demais opções são encaminhadas ao Aider.
+O comando é um executável real, não um alias de shell. Por isso funciona da mesma forma no Bash e no Zsh. A configuração da stack fica em `~/.config/local-coding-ai/stack-dir`, enquanto os modelos escolhidos ficam no `.env` da instalação. Execute `ai.localhost --help` para ver as opções próprias; as demais opções são encaminhadas ao assistente escolhido.
 
 Ao iniciar, o comando sempre mostra um resumo curto com a URL da interface web, projeto e modelo ativos e os comandos para usar o modelo de código, baixar ou selecionar outro modelo e abrir outro projeto. A ajuda completa permanece disponível em `ai.localhost --help`.
 
@@ -593,24 +600,25 @@ aider --model ollama_chat/qwen3.5:9b
 
 Dentro do Aider, peça mudanças pequenas e revise o diff antes de commitar.
 
-## Como Usar OpenCode com Ollama Local
-
-O OpenCode é instalado junto com o ambiente, mas não substitui o Aider: `ai.localhost` continua abrindo o Aider por padrão. Para abrir o OpenCode no repositório atual com o modelo de código configurado em `.env`, use:
+Com a stack já ativa, os comandos diretos também funcionam dentro de qualquer repositório Git:
 
 ```bash
-cd ~/workspace/meu-projeto
-ai.localhost --opencode
-```
-
-Com a stack já ativa, o comando direto também funciona dentro de qualquer repositório Git:
-
-```bash
+OLLAMA_API_BASE=http://localhost:11434 aider --model ollama_chat/qwen3.5:9b
 opencode
 ```
 
-A configuração inicial fica em `~/.config/opencode/opencode.json`. Ela conecta apenas a API local `http://127.0.0.1:11434`, oferece os modelos Qwen usados pelo instalador e pede confirmação antes de editar arquivos, executar comandos, chamar subagentes ou acessar skills. Leitura de arquivos `.env` é bloqueada; busca e coleta web também começam bloqueadas. Se já existir uma configuração do OpenCode, o instalador a preserva e não a substitui.
+A configuração inicial do OpenCode fica em `~/.config/opencode/opencode.json`. Ela conecta apenas a API local `http://127.0.0.1:11434`, oferece os modelos Qwen usados pelo instalador e pede confirmação antes de editar arquivos, executar comandos, chamar subagentes ou acessar skills. Leitura de arquivos `.env` é bloqueada; busca e coleta web também começam bloqueadas. Se já existir uma configuração do OpenCode, o instalador a preserva e não a substitui.
 
-Os modelos continuam pertencendo ao Ollama: o OpenCode não mantém uma cópia, nem faz download paralelo. O comando `ai.localhost --opencode` lê `OLLAMA_CODE_MODEL_DEFAULT` do `.env` e o envia ao OpenCode. Já o comando direto `opencode` usa a própria configuração global e o seletor `/models`; ele não relê o `.env` automaticamente. Depois de alterar o `.env`, prefira o launcher ou selecione no OpenCode um modelo que já esteja listado por `make models`.
+Os modelos continuam pertencendo ao Ollama: nenhum dos dois assistentes mantém uma cópia, nem faz download paralelo. Após a instalação, as configurações usam os dois modelos escolhidos para a máquina:
+
+| Ferramenta | Modo | Modelo |
+| --- | --- | --- |
+| Aider | `code` e editor do modo `architect` | `OLLAMA_AIDER_MODEL_DEFAULT` e `OLLAMA_CODE_MODEL_DEFAULT` (programação) |
+| Aider | conversa, análise e sumarização | `OLLAMA_MODEL_DEFAULT` (geral), disponível como alias `local-chat` |
+| OpenCode | `Build` | `OLLAMA_OPENCODE_MODEL_DEFAULT` (programação) |
+| OpenCode | `Plan` | `OLLAMA_MODEL_DEFAULT` (geral, sem edição nem comandos) |
+
+No Aider, `code` é o modo inicial; use `/ask` para conversar sem editar e `/architect` para o fluxo arquiteto/editor. Os aliases `/model local-chat` e `/model local-code` deixam os dois modelos disponíveis durante a sessão. No OpenCode, `Build` é o agente inicial e `Plan` usa o modelo geral; alterne entre eles com `Tab`. O comando direto `opencode` usa essa configuração global; ele não relê o `.env` automaticamente.
 
 Para selecionar outro modelo local no OpenCode, use o seletor `/models` ou abra pelo comando auxiliar com o identificador do Ollama:
 

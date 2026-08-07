@@ -19,6 +19,23 @@
       }
     }
   },
+  "default_agent": "build",
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "model": "ollama/__OPENCODE_BUILD_MODEL__",
+      "description": "Implementa e edita código com o modelo local de programação."
+    },
+    "plan": {
+      "mode": "primary",
+      "model": "ollama/__OPENCODE_PLAN_MODEL__",
+      "description": "Analisa, conversa e planeja mudanças sem editar arquivos.",
+      "permission": {
+        "edit": "deny",
+        "bash": "deny"
+      }
+    }
+  },
   "permission": {
     "*": "ask",
     "read": {

@@ -160,7 +160,7 @@ EOF
 
   if [[ "${HAS_STATE}" == false ]]; then
     warn "manifesto não encontrado; esta parece ser uma instalação anterior ao rastreamento"
-    warn "serão removidos os recursos próprios da stack, mas Aider, CA, pacotes APT e configuração NVIDIA serão preservados por segurança"
+    warn "serão removidos os recursos próprios da stack, mas Aider, OpenCode, CA, pacotes APT e configuração NVIDIA serão preservados por segurança"
   fi
 }
 

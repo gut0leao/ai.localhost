@@ -7,10 +7,11 @@ RAW_INSTALLER_URL="https://raw.githubusercontent.com/gut0leao/ai.localhost/main/
 DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
 STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/local-coding-ai"
 INSTALL_DIR="${LOCAL_AI_INSTALL_DIR:-${DEFAULT_INSTALL_DIR}}"
-PROJECT_DIR="${AIDER_PROJECT_DIR:-${PWD}}"
+PROJECT_DIR="${LOCAL_AI_PROJECT_DIR:-${AIDER_PROJECT_DIR:-${PWD}}}"
 GENERAL_MODEL="${LOCAL_AI_GENERAL_MODEL:-}"
 CODE_MODEL="${LOCAL_AI_CODE_MODEL:-}"
 AIDER_MODEL="${LOCAL_AI_AIDER_MODEL:-}"
+OPENCODE_MODEL="${LOCAL_AI_OPENCODE_MODEL:-}"
 AI_COMMAND_PATH="${HOME}/.local/bin/ai.localhost"
 OPENCODE_BINARY_PATH="${HOME}/.opencode/bin/opencode"
 OPENCODE_COMMAND_PATH="${HOME}/.local/bin/opencode"
@@ -18,7 +19,7 @@ OPENCODE_CONFIG_PATH="${XDG_CONFIG_HOME:-${HOME}/.config}/opencode/opencode.json
 ASSUME_YES=false
 CHECK_ONLY=false
 FORCE_CPU=false
-LAUNCH_AIDER=true
+LAUNCH_CLIENT=""
 GPU_AVAILABLE=false
 GPU_VRAM_MB=0
 SYSTEM_RAM_MB=0
@@ -132,17 +133,20 @@ Opções:
   --check-only           Verifica o ambiente sem instalar ou baixar arquivos.
   --yes                  Aceita as confirmações automaticamente.
   --cpu                  Ignora GPU e configura execução em CPU.
-  --no-launch            Instala tudo sem abrir o Aider ao final.
+  --no-launch            Instala sem abrir um assistente ao final (padrão).
+  --launch-aider         Ao final, oferece abrir o Aider no repositório informado.
+  --launch-opencode      Ao final, oferece abrir o OpenCode no repositório informado.
   --install-dir CAMINHO  Diretório da stack (padrão: ${DEFAULT_INSTALL_DIR}).
-  --project-dir CAMINHO  Repositório que o Aider abrirá (padrão: diretório atual).
+  --project-dir CAMINHO  Repositório que o assistente escolhido abrirá (padrão: diretório atual).
   --general-model MODELO Sobrescreve o modelo Qwen geral escolhido automaticamente.
   --code-model MODELO    Sobrescreve o modelo Qwen de código escolhido automaticamente.
   --aider-model MODELO   Sobrescreve o modelo usado para abrir o Aider.
+  --opencode-model MODELO Sobrescreve o modelo usado para abrir o OpenCode.
   -h, --help             Exibe esta ajuda.
 
 As mesmas opções de modelos podem ser definidas por LOCAL_AI_GENERAL_MODEL,
-LOCAL_AI_CODE_MODEL e LOCAL_AI_AIDER_MODEL. LOCAL_AI_INSTALL_DIR e
-AIDER_PROJECT_DIR também são aceitas.
+LOCAL_AI_CODE_MODEL, LOCAL_AI_AIDER_MODEL e LOCAL_AI_OPENCODE_MODEL. LOCAL_AI_INSTALL_DIR e
+LOCAL_AI_PROJECT_DIR também são aceitas; AIDER_PROJECT_DIR permanece compatível com instalações anteriores.
 EOF
 }
 
@@ -176,7 +180,13 @@ parse_args() {
         FORCE_CPU=true
         ;;
       --no-launch)
-        LAUNCH_AIDER=false
+        LAUNCH_CLIENT=""
+        ;;
+      --launch-aider)
+        LAUNCH_CLIENT="aider"
+        ;;
+      --launch-opencode)
+        LAUNCH_CLIENT="opencode"
         ;;
       --install-dir)
         [[ $# -ge 2 ]] || fail "--install-dir requer um caminho"
@@ -201,6 +211,11 @@ parse_args() {
       --aider-model)
         [[ $# -ge 2 ]] || fail "--aider-model requer um modelo"
         AIDER_MODEL="$2"
+        shift
+        ;;
+      --opencode-model)
+        [[ $# -ge 2 ]] || fail "--opencode-model requer um modelo"
+        OPENCODE_MODEL="$2"
         shift
         ;;
       -h|--help)
@@ -289,7 +304,8 @@ select_models() {
     fi
   fi
 
-  AIDER_MODEL="${AIDER_MODEL:-${GENERAL_MODEL}}"
+  AIDER_MODEL="${AIDER_MODEL:-${CODE_MODEL}}"
+  OPENCODE_MODEL="${OPENCODE_MODEL:-${CODE_MODEL}}"
 
   [[ "${GENERAL_MODEL}" =~ ^[A-Za-z0-9._:/-]+$ ]] \
     || fail "identificador de modelo geral inválido: ${GENERAL_MODEL}"
@@ -297,8 +313,10 @@ select_models() {
     || fail "identificador de modelo de código inválido: ${CODE_MODEL}"
   [[ "${AIDER_MODEL}" =~ ^[A-Za-z0-9._:/-]+$ ]] \
     || fail "identificador de modelo do Aider inválido: ${AIDER_MODEL}"
+  [[ "${OPENCODE_MODEL}" =~ ^[A-Za-z0-9._:/-]+$ ]] \
+    || fail "identificador de modelo do OpenCode inválido: ${OPENCODE_MODEL}"
 
-  case "${GENERAL_MODEL} ${CODE_MODEL}" in
+  case "${GENERAL_MODEL} ${CODE_MODEL} ${AIDER_MODEL} ${OPENCODE_MODEL}" in
     *qwen3.6*|*qwen3-coder:30b*) REQUIRED_DISK_GB=45 ;;
     *qwen3.5:9b*|*qwen2.5-coder:7b*) REQUIRED_DISK_GB=18 ;;
     *qwen3.5:4b*|*qwen2.5-coder:3b*) REQUIRED_DISK_GB=12 ;;
@@ -390,9 +408,10 @@ show_preflight() {
   printf 'Modelo geral:  %s\n' "${GENERAL_MODEL}"
   printf 'Modelo código: %s\n' "${CODE_MODEL}"
   printf 'Modelo Aider:  %s\n' "${AIDER_MODEL}"
+  printf 'Modelo OpenCode: %s\n' "${OPENCODE_MODEL}"
   printf 'Disco mínimo:  ~%s GB livres\n' "${REQUIRED_DISK_GB}"
   printf 'Instalação:    %s\n' "${INSTALL_DIR}"
-  printf 'Projeto Aider: %s\n' "${PROJECT_DIR}"
+  printf 'Projeto assistente: %s\n' "${PROJECT_DIR}"
 }
 
 install_base_packages() {
@@ -538,6 +557,7 @@ configure_environment() {
   set_env_value "${env_file}" OLLAMA_MODEL_DEFAULT "${GENERAL_MODEL}"
   set_env_value "${env_file}" OLLAMA_CODE_MODEL_DEFAULT "${CODE_MODEL}"
   set_env_value "${env_file}" OLLAMA_AIDER_MODEL_DEFAULT "${AIDER_MODEL}"
+  set_env_value "${env_file}" OLLAMA_OPENCODE_MODEL_DEFAULT "${OPENCODE_MODEL}"
   set_env_value "${env_file}" LOCAL_AI_CA_BUNDLE "/etc/ssl/certs/ca-certificates.crt"
   set_env_value "${env_file}" SEARXNG_QUERY_URL "'http://searxng:8080/search?q=<query>'"
   if [[ "${GPU_AVAILABLE}" == true ]]; then
@@ -611,6 +631,7 @@ install_aider() {
 
 install_opencode_configuration() {
   local config_dir
+  local temporary_config
 
   config_dir="$(dirname "${OPENCODE_CONFIG_PATH}")"
   if [[ -e "${OPENCODE_CONFIG_PATH}" ]]; then
@@ -621,8 +642,14 @@ install_opencode_configuration() {
   [[ -d "${config_dir}" ]] || state_mark opencode-config-dir-created
   mkdir -p "${config_dir}"
   backup_user_file_once "${OPENCODE_CONFIG_PATH}" opencode-config
-  install -m 0600 "${INSTALL_DIR}/opencode/opencode.json" "${OPENCODE_CONFIG_PATH}"
-  success "OpenCode configurado para usar o Ollama local"
+  temporary_config="$(mktemp)"
+  sed \
+    -e "s|__OPENCODE_BUILD_MODEL__|${OPENCODE_MODEL}|g" \
+    -e "s|__OPENCODE_PLAN_MODEL__|${GENERAL_MODEL}|g" \
+    "${INSTALL_DIR}/opencode/opencode.json" >"${temporary_config}"
+  install -m 0600 "${temporary_config}" "${OPENCODE_CONFIG_PATH}"
+  rm -f "${temporary_config}"
+  success "OpenCode configurado: Build usa ${OPENCODE_MODEL}; Plan usa ${GENERAL_MODEL}"
 }
 
 install_opencode() {
@@ -719,6 +746,13 @@ download_models() {
     info "Baixando modelo adicional configurado para o Aider: ${AIDER_MODEL}"
     make -C "${INSTALL_DIR}" pull-model MODEL="${AIDER_MODEL}"
   fi
+
+  if [[ "${OPENCODE_MODEL}" != "${GENERAL_MODEL}" \
+    && "${OPENCODE_MODEL}" != "${CODE_MODEL}" \
+    && "${OPENCODE_MODEL}" != "${AIDER_MODEL}" ]]; then
+    info "Baixando modelo adicional configurado para o OpenCode: ${OPENCODE_MODEL}"
+    make -C "${INSTALL_DIR}" pull-model MODEL="${OPENCODE_MODEL}"
+  fi
 }
 
 show_handoff() {
@@ -732,20 +766,19 @@ Open WebUI:  https://ai.localhost
 Ollama API:  http://localhost:11434
 Modelo geral: ${GENERAL_MODEL}
 Modelo Aider: ${AIDER_MODEL}
+Modelo OpenCode: ${OPENCODE_MODEL}
 Stack:        ${INSTALL_DIR}
 
 Comandos úteis:
   Abrir o Aider no repositório atual:
-    ai.localhost
-
-  Abrir com o modelo especializado em código:
-    ai.localhost --code
+    ai.localhost --aider
 
   Abrir o OpenCode com o modelo de código:
     ai.localhost --opencode
 
   Abrir diretamente outro repositório:
-    ai.localhost --project /caminho/do/projeto
+    ai.localhost --aider --project /caminho/do/projeto
+    ai.localhost --opencode --project /caminho/do/projeto
 
   Baixar outro modelo:
     make -C "${INSTALL_DIR}" pull-model MODEL=<modelo>
@@ -780,7 +813,7 @@ O Aider e o OpenCode serão abertos somente dentro de um repositório Git escolh
 EOF
 }
 
-resolve_aider_project() {
+resolve_launch_project() {
   local chosen_path
 
   if git -C "${PROJECT_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -788,16 +821,16 @@ resolve_aider_project() {
     return 0
   fi
 
-  if [[ "${LAUNCH_AIDER}" == false ]]; then
+  if [[ -z "${LAUNCH_CLIENT}" ]]; then
     return 1
   fi
 
   if [[ ! -r /dev/tty ]]; then
-    warn "${PROJECT_DIR} não é um repositório Git; o Aider não será aberto"
+    warn "${PROJECT_DIR} não é um repositório Git; nenhum assistente será aberto"
     return 1
   fi
 
-  printf 'Caminho do repositório Git para abrir no Aider (vazio para não abrir): ' >/dev/tty
+  printf 'Caminho do repositório Git para abrir o %s (vazio para não abrir): ' "${LAUNCH_CLIENT}" >/dev/tty
   read -r chosen_path </dev/tty || true
   [[ -n "${chosen_path}" ]] || return 1
   [[ -d "${chosen_path}" ]] || fail "diretório não encontrado: ${chosen_path}"
@@ -806,13 +839,13 @@ resolve_aider_project() {
   PROJECT_DIR="$(cd "${chosen_path}" && pwd)"
 }
 
-launch_aider() {
-  [[ "${LAUNCH_AIDER}" == true ]] || return 0
-  resolve_aider_project || return 0
-  confirm "Abrir o Aider agora em ${PROJECT_DIR}?" || return 0
+launch_assistant() {
+  [[ -n "${LAUNCH_CLIENT}" ]] || return 0
+  resolve_launch_project || return 0
+  confirm "Abrir o ${LAUNCH_CLIENT} agora em ${PROJECT_DIR}?" || return 0
 
-  info "Abrindo Aider com ${AIDER_MODEL}"
-  exec "${AI_COMMAND_PATH}" --project "${PROJECT_DIR}"
+  info "Abrindo ${LAUNCH_CLIENT}"
+  exec "${AI_COMMAND_PATH}" "--${LAUNCH_CLIENT}" --project "${PROJECT_DIR}"
 }
 
 main() {
@@ -870,7 +903,7 @@ main() {
   download_models
   install_ai_command
   show_handoff
-  launch_aider
+  launch_assistant
 }
 
 main "$@"
