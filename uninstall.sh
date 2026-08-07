@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY_URL="https://github.com/gut0leao/ai.localhost.git"
-LEGACY_REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
-RAW_UNINSTALLER_URL="https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh"
-DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
-STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/local-coding-ai"
-INSTALL_DIR="${LOCAL_AI_INSTALL_DIR:-}"
+REPOSITORY_URL="https://github.com/gut0leao/localhost.ai.git"
+LEGACY_REPOSITORY_URL="https://github.com/gut0leao/ai.localhost.git"
+OLDER_LEGACY_REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
+RAW_UNINSTALLER_URL="https://raw.githubusercontent.com/gut0leao/localhost.ai/main/uninstall.sh"
+DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/localhost-ai"
+LEGACY_DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
+STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/localhost-ai"
+LEGACY_STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/local-coding-ai"
+INSTALL_DIR="${LOCALHOST_AI_INSTALL_DIR:-${LOCAL_AI_INSTALL_DIR:-}}"
 INSTALL_DIR_EXPLICIT=false
 [[ -z "${INSTALL_DIR}" ]] || INSTALL_DIR_EXPLICIT=true
 ASSUME_YES=false
@@ -34,7 +37,7 @@ fail() {
 
 usage() {
   cat <<EOF
-Desinstalador completo do ai.localhost
+Desinstalador completo do localhost.ai
 
 Uso local:
   ./uninstall.sh [opções]
@@ -104,6 +107,10 @@ detect_locations() {
     fi
   fi
 
+  if [[ ! -r "${STATE_DIR}/format-version" && -r "${LEGACY_STATE_DIR}/format-version" ]]; then
+    STATE_DIR="${LEGACY_STATE_DIR}"
+  fi
+
   if [[ -r "${STATE_DIR}/format-version" && -r "${STATE_DIR}/install-dir" ]]; then
     HAS_STATE=true
     IFS= read -r manifest_install_dir <"${STATE_DIR}/install-dir"
@@ -127,7 +134,7 @@ detect_locations() {
       warn "o manifesto indica um checkout criado pelo instalador, mas ${INSTALL_DIR} já foi removido"
     elif [[ -d "${INSTALL_DIR}/.git" ]]; then
       case "$(git -C "${INSTALL_DIR}" remote get-url origin 2>/dev/null || true)" in
-        "${REPOSITORY_URL}"|"${LEGACY_REPOSITORY_URL}"|git@github.com:gut0leao/ai.localhost.git|git@github.com:gut0leao/local-coding-ai.git) REMOVE_CHECKOUT=true ;;
+        "${REPOSITORY_URL}"|"${LEGACY_REPOSITORY_URL}"|"${OLDER_LEGACY_REPOSITORY_URL}"|git@github.com:gut0leao/localhost.ai.git|git@github.com:gut0leao/ai.localhost.git|git@github.com:gut0leao/local-coding-ai.git) REMOVE_CHECKOUT=true ;;
         *) fail "o manifesto pede a remoção do checkout, mas ${INSTALL_DIR} não corresponde ao repositório esperado" ;;
       esac
     else
@@ -140,7 +147,7 @@ show_plan() {
   cat <<EOF
 
 ============================================================
-Desinstalação completa do ai.localhost
+Desinstalação completa do localhost.ai
 ============================================================
 Stack:      ${INSTALL_DIR}
 Manifesto: ${STATE_DIR}
@@ -149,7 +156,7 @@ Serão removidos:
   - containers, rede, volumes, modelos e conversas da stack;
   - imagens Docker baixadas exclusivamente pelo instalador;
   - certificados locais e a confiança da CA criada pelo instalador;
-  - comando ai.localhost e sua configuração;
+  - comando localhost.ai e sua configuração;
   - Aider, OpenCode e pacotes APT somente se instalados por este projeto;
   - configuração NVIDIA criada pelo instalador, restaurando daemon.json;
   - checkout da stack somente se ele foi clonado pelo instalador.
@@ -340,6 +347,7 @@ remove_path_entries() {
       *) warn "arquivo de shell inesperado no manifesto; preservando ${path_file}"; continue ;;
     esac
     if [[ -f "${path_file}" ]]; then
+      sed -i '/^# >>> localhost-ai PATH >>>$/,/^# <<< localhost-ai PATH <<<$/{d;}' "${path_file}"
       sed -i '/^# >>> local-coding-ai PATH >>>$/,/^# <<< local-coding-ai PATH <<<$/{d;}' "${path_file}"
     fi
     if grep -Fqx -- "${path_file}" "${STATE_DIR}/path-created-files" 2>/dev/null \
@@ -359,6 +367,7 @@ remove_assistant_command_entries() {
       *) warn "arquivo de shell inesperado no manifesto; preservando ${shell_file}"; continue ;;
     esac
     if [[ -f "${shell_file}" ]]; then
+      sed -i '/^# >>> localhost-ai assistants >>>$/,/^# <<< localhost-ai assistants <<<$/{d;}' "${shell_file}"
       sed -i '/^# >>> local-coding-ai assistants >>>$/,/^# <<< local-coding-ai assistants <<<$/{d;}' "${shell_file}"
     fi
     if grep -Fqx -- "${shell_file}" "${STATE_DIR}/assistant-command-created-files" 2>/dev/null \
@@ -369,8 +378,8 @@ remove_assistant_command_entries() {
 }
 
 restore_user_configuration() {
-  local launcher_path="${HOME}/.local/bin/ai.localhost"
-  local stack_config_path="${XDG_CONFIG_HOME:-${HOME}/.config}/local-coding-ai/stack-dir"
+  local launcher_path="${HOME}/.local/bin/localhost.ai"
+  local stack_config_path="${XDG_CONFIG_HOME:-${HOME}/.config}/localhost-ai/stack-dir"
   local opencode_config_path="${XDG_CONFIG_HOME:-${HOME}/.config}/opencode/opencode.json"
 
   if [[ -r "${STATE_DIR}/launcher-path" ]]; then
@@ -379,10 +388,12 @@ restore_user_configuration() {
   if [[ -r "${STATE_DIR}/stack-dir-config-path" ]]; then
     IFS= read -r stack_config_path <"${STATE_DIR}/stack-dir-config-path"
   fi
-  [[ "$(realpath -m "${launcher_path}")" == "${HOME}/.local/bin/ai.localhost" ]] \
-    || fail "caminho inesperado para o launcher: ${launcher_path}"
+  case "$(realpath -m "${launcher_path}")" in
+    "${HOME}/.local/bin/localhost.ai"|"${HOME}/.local/bin/ai.localhost") ;;
+    *) fail "caminho inesperado para o launcher: ${launcher_path}" ;;
+  esac
   case "$(realpath -m "${stack_config_path}")" in
-    "${HOME}"/*/local-coding-ai/stack-dir) ;;
+    "${HOME}"/*/localhost-ai/stack-dir|"${HOME}"/*/local-coding-ai/stack-dir) ;;
     *) fail "caminho inesperado para a configuração: ${stack_config_path}" ;;
   esac
 
@@ -472,7 +483,7 @@ main() {
   restart_docker_if_needed
   remove_checkout_and_state
 
-  success "ai.localhost foi desinstalado"
+  success "localhost.ai foi desinstalado"
   printf 'Abra um novo terminal para recarregar o PATH.\n'
 }
 

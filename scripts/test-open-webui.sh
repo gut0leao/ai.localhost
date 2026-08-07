@@ -9,7 +9,7 @@ source "${ROOT_DIR}/scripts/env.sh"
 load_project_env "${ROOT_DIR}" "${ENV_FILE}"
 
 AI_BIND_HOST="${AI_BIND_HOST:-127.0.0.1}"
-AI_HOSTNAME="${AI_HOSTNAME:-ai.localhost}"
+AI_HOSTNAME="${LOCALHOST_AI_HOSTNAME:-${AI_HOSTNAME:-ai.localhost}}"
 AI_HTTP_PORT="${AI_HTTP_PORT:-80}"
 AI_HTTPS_PORT="${AI_HTTPS_PORT:-443}"
 

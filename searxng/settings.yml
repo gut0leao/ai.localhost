@@ -1,7 +1,7 @@
 use_default_settings: true
 
 general:
-  instance_name: "local-coding-ai"
+  instance_name: "localhost.ai"
 
 search:
   safe_search: 0
@@ -14,7 +14,7 @@ search:
 server:
   bind_address: "0.0.0.0"
   port: 8080
-  secret_key: "change-me-local-coding-ai"
+  secret_key: "change-me-localhost-ai"
   limiter: false
   image_proxy: false
 

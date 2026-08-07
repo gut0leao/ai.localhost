@@ -1,87 +1,86 @@
-# ai.localhost
+# localhost.ai
 
-Ambiente local, privado e reproduzível de IA para conversas, análise de documentos e desenvolvimento com código usando Docker Compose, Ollama, Open WebUI, Aider e OpenCode.
+**Distribuição leve para criar uma estação de trabalho de IA local, com configuração reproduzível, opinativa e orientada à privacidade.**
 
-O objetivo do projeto é facilitar a instalação e configuração dessas ferramentas em ambiente local, para que pessoas e organizações consigam rodar modelos de linguagem na própria estação de trabalho sem montar manualmente toda a pilha de ferramentas envolvidas.
+O **localhost.ai** integra execução de modelos, chat, RAG e desenvolvimento assistido por IA em Linux ou Windows com WSL2. Seu propósito não é ensinar a instalar produtos isolados: é reduzir as decisões, os riscos de configuração e o trabalho necessário para obter um ambiente coerente e compreensível.
 
-Com isso, o **ai.localhost** oferece produtividade individual sem depender de APIs externas, mantendo documentos, prompts, conversas e código no host/WSL e expondo os serviços apenas em `localhost`.
+O projeto está em evolução. A instalação atual já conecta os componentes descritos abaixo, mas ainda não oferece isolamento de rede, auditoria completa, backup integrado nem versionamento imutável de todas as dependências.
 
-O repositório e a interface usam o nome `ai.localhost`. Os diretórios internos, o manifesto e os volumes preservam o identificador histórico `local-coding-ai` para que instalações existentes continuem funcionando após a mudança de nome.
+Leia a [visão e os princípios arquiteturais](docs/VISION.md) e o [roadmap](docs/ROADMAP.md).
 
-## Visão
+> O projeto, o repositório e o comando usam o nome `localhost.ai`. A interface continua em `https://ai.localhost`: esse hostname é reservado para loopback e não depende de DNS externo. Instalações anteriores com os nomes `ai.localhost` e `local-coding-ai` permanecem compatíveis.
 
-O **ai.localhost** transforma uma estação de trabalho Windows/Linux em um ambiente privado de inteligência artificial. Ele aproveita CPU e GPU locais para entregar uma primeira camada individual de produtividade, sem enviar dados sensíveis para provedores externos.
+## O problema que resolve
 
-A solução é complementar a plataformas corporativas de IA: tarefas locais, experimentações, análise de documentos e apoio ao desenvolvimento podem acontecer na própria estação; modelos maiores, integrações institucionais e governança centralizada continuam cabendo às soluções compartilhadas da organização.
+Montar uma estação de IA local exige escolher modelos e ferramentas, conectar serviços, configurar GPU, portas, certificados, persistência e permissões, além de diagnosticar diferenças entre Windows, WSL2 e Docker. Em redes corporativas, proxies TLS e CAs internas acrescentam outra camada de falhas possíveis.
 
-Leia a visão completa em [docs/VISION.md](docs/VISION.md).
+O **localhost.ai** fornece convenções e uma integração testável para que o usuário não precise compreender todo esse ecossistema antes de começar. O valor está na coerência do conjunto: procedimento de instalação repetível, configurações compatíveis, defaults conservadores, persistência conhecida e operação documentada.
 
-## Visão Geral
+## Para quem é útil
 
-Este projeto entrega uma stack simples para Linux/WSL2:
+- pessoas que desejam experimentar modelos locais sem montar cada integração manualmente;
+- desenvolvedores que trabalham com código que não deve ser enviado diretamente a serviços externos;
+- profissionais que analisam documentos e usam chat/RAG individualmente;
+- estações Windows + WSL2, inclusive sob VPN, proxy ou CA corporativa;
+- organizações que desejam aproveitar GPUs já disponíveis e frequentemente subutilizadas nas estações de trabalho.
 
-- Ollama em container para executar LLMs localmente.
-- Open WebUI em container para interface web local.
-- Caddy como proxy reverso local para `ai.localhost`.
-- Volumes nomeados para persistir modelos e dados.
-- Bind padrão em `127.0.0.1`, sem exposição para a rede local.
-- Scripts e Makefile para operação diária.
-- Comando global `ai.localhost` para iniciar o ambiente e abrir explicitamente Aider ou OpenCode no projeto atual.
-- Aider e OpenCode no host/WSL, apontados para o Ollama local.
+O projeto atua na camada individual da estação. Não substitui plataformas corporativas de IA, seus controles de acesso, governança centralizada, integrações institucionais ou capacidade compartilhada.
 
-## Componentes e Fluxo
+## O que a distribuição configura hoje
 
-| Componente | Papel no ambiente |
+| Função | Implementação atual | Papel arquitetural |
+|---|---|---|
+| Runtime local de modelos | Ollama | Componente essencial atual; deve poder ser substituído futuramente por outro runtime compatível. |
+| Chat e RAG | Open WebUI | Componente essencial atual para interface, conversas, uploads e indexação. |
+| Desenvolvimento assistido | OpenCode | Experiência de agente mais abrangente e principal candidato para esse papel. |
+| Desenvolvimento complementar | Aider | Alternativa mais direta de terminal; sobrepõe parte do OpenCode e é instalado hoje por compatibilidade e escolha do usuário. |
+| HTTPS local | Caddy + mkcert | Publicação local da interface com certificado confiável no host. |
+| Busca web | SearXNG | Componente opcional, ativado por perfil do Compose. |
+| Integração e operação | Compose, `.env`, scripts e manifesto | Convenções, seleção de modelos, diagnóstico inicial, persistência e reversão cuidadosa das alterações do instalador. |
+
+O instalador atual ainda instala **OpenCode e Aider**. Isso descreve o comportamento desta versão, não uma dependência conceitual dos dois. Tornar a ferramenta de desenvolvimento selecionável por perfil, mantendo Aider como opção, está no roadmap; nenhuma ferramenta foi removida nesta revisão.
+
+## Diferencial em relação à instalação manual
+
+- seleciona modelos compatíveis com os recursos detectados;
+- conecta runtime, interface web e ferramentas de desenvolvimento;
+- mantém portas publicadas em `127.0.0.1` por padrão;
+- configura HTTPS local e confiança do certificado em Linux/WSL e, quando possível, no Windows;
+- trata CA corporativa compartilhada com os containers;
+- registra em manifesto as alterações feitas pelo instalador para permitir restauração cuidadosa;
+- padroniza diretórios, volumes, variáveis e comandos de operação;
+- valida GPU, serviços e conectividade antes e depois da instalação.
+
+Atalhos que apenas economizam digitação existem por conveniência e compatibilidade, mas não são o núcleo estratégico do projeto. O critério para novas funcionalidades é reduzir complexidade, risco ou decisões — não apenas reduzir o número de comandos.
+
+## Processamento local, Internet e limites
+
+| Situação | Comportamento atual |
 |---|---|
-| Docker Compose | Sobe e conecta os serviços, além de criar os volumes persistentes. Os atalhos `make` executam comandos do Compose. |
-| Ollama | Servidor local que baixa, armazena e executa os modelos de linguagem. Sua API fica disponível no host em `http://localhost:11434`. |
-| Modelo LLM | A IA que gera respostas. O modelo padrão é definido por `OLLAMA_MODEL_DEFAULT` no arquivo `.env`. |
-| Open WebUI | Interface web local para conversar com os modelos. Não publica uma porta diretamente no host e conecta-se ao Ollama pela rede Docker. |
-| Caddy | Proxy reverso que publica o Open WebUI em `https://ai.localhost` e redireciona automaticamente requisições HTTP para HTTPS. |
-| Aider | Assistente de programação de terminal instalado no host/WSL. Ao ser iniciado dentro de um repositório, usa o Ollama local e pode trabalhar nos arquivos desse repositório. |
-| OpenCode | Assistente de terminal com sessões, subagentes, comandos, skills, MCPs e hooks. É instalado no host/WSL e usa exclusivamente o Ollama local nesta configuração. |
-| `ai.localhost` | Comando instalado em `~/.local/bin` que inicia a stack quando necessário, seleciona o modelo configurado e abre Aider ou OpenCode mediante escolha explícita. |
-| SearXNG | Metabuscador opcional, iniciado somente com `make up-web-search`, que fornece busca web ao Open WebUI. |
-| Volumes nomeados | Preservam os modelos do Ollama, os dados do Open WebUI e o cache do SearXNG mesmo após `make down`. |
-| `.env` | Configuração local de portas, modelo padrão, autenticação e opções de busca; deve ser criado a partir de `.env.example`. |
+| Inferência padrão | Prompts são enviados ao Ollama local; não é necessária uma API comercial de modelos. |
+| Instalação e atualização | Acessam GitHub, registros de containers, repositórios de pacotes e catálogos de modelos. |
+| Busca web opcional | SearXNG e Open WebUI acessam fontes externas quando o perfil de busca é habilitado. |
+| OpenCode | A configuração gerada usa o Ollama local e começa com ferramentas web negadas; uma configuração preexistente é preservada e pode usar outros provedores. O processo continua tecnicamente capaz de rede conforme configuração e plugins. |
+| Aider | O launcher desativa a verificação de atualização e aponta para o Ollama local; outras formas de execução podem ter comportamento diferente. |
+| Containers | Não há política de bloqueio de egress: serviços na rede Docker podem tecnicamente alcançar a Internet. |
 
-Fluxo padrão, totalmente local:
+`localhost`, HTTPS e execução local reduzem exposição, mas não equivalem a isolamento ou auditoria de segurança. As imagens usam tags móveis (`latest` e `main`), não há SBOM/verificação de assinatura, backup automatizado ou comando de auditoria. Consulte [Privacidade e Segurança](#privacidade-e-segurança) e o [roadmap](docs/ROADMAP.md).
+
+## Arquitetura atual
 
 ```text
-Navegador
-    ↓ https://ai.localhost
-Caddy → Open WebUI → Ollama → modelo local
+Windows + WSL2 / Linux
+├── navegador → Caddy → Open WebUI ─┐
+├── OpenCode / Aider ───────────────┼→ Ollama → modelos em volume local
+└── SearXNG opcional → Internet ────┘
 
-Aider / OpenCode / curl
-    ↓ http://localhost:11434
-Ollama → modelo local
-```
-
-Com a busca web opcional habilitada, o Open WebUI consulta o SearXNG, que por sua vez pode fazer requisições a mecanismos e fontes externos. Sem esse modo, o ambiente não acessa a internet para responder aos prompts.
-
-## Objetivos do Projeto
-
-- Privacidade do código e dos prompts.
-- Execução local sem serviços cloud.
-- Reprodutibilidade em outra máquina.
-- Seleção automática entre CPU e GPU NVIDIA no instalador, com comandos explícitos para operação manual.
-- Evitar permissões amplas, `privileged: true`, `network_mode: host` e montagens sensíveis.
-
-## Arquitetura
-
-```text
-WSL2/Linux Host
-├── Navegador → Caddy → Open WebUI ┐
-├── Aider / OpenCode ──────────────┼→ Ollama → modelo local
-└── curl ──────────────────────────┘
-
-Docker Compose: Caddy, Open WebUI, Ollama e SearXNG opcional
-Host/WSL: Aider, OpenCode e o comando ai.localhost
+Docker Compose: Ollama, Open WebUI, Caddy e SearXNG opcional
+Host/WSL: ferramentas de desenvolvimento, configuração e comandos de integração
 ```
 
 ## Comece Aqui
 
-Se você não costuma instalar ferramentas de desenvolvimento, siga esta ordem. O instalador do **ai.localhost** prepara a stack local de IA, mas ele pressupõe que WSL/Linux e Docker já estejam funcionando.
+Se você não costuma instalar ferramentas de desenvolvimento, siga esta ordem. O instalador do **localhost.ai** prepara a stack local de IA, mas ele pressupõe que WSL/Linux e Docker já estejam funcionando.
 
 ### 1. Prepare o sistema operacional
 
@@ -161,7 +160,7 @@ O instalador tenta instalar automaticamente dependências comuns como `curl`, Gi
 Antes de instalar de fato, execute o diagnóstico. Ele não baixa modelos nem altera a stack:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh \
   | bash -s -- --check-only
 ```
 
@@ -169,11 +168,11 @@ Se o diagnóstico passar, siga para a instalação automatizada.
 
 ## Instalação Automatizada
 
-Com os pré-requisitos prontos, execute o instalador diretamente do GitHub. Por padrão, ele instala ambos os assistentes e não abre nenhum deles ao final:
+Com os pré-requisitos prontos, execute o instalador diretamente do GitHub. Por compatibilidade, a versão atual instala os dois assistentes de desenvolvimento e não abre nenhum deles ao final:
 
 ```bash
 cd ~
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh \
   | bash -s -- --no-launch
 ```
 
@@ -187,34 +186,34 @@ Se você é desenvolvedor, escolha o assistente ao entrar em um repositório Git
 
 ```bash
 cd ~/workspace/meu-projeto
-ai.localhost --aider
-ai.localhost --opencode
+aider
+opencode
 ```
 
 Também é possível iniciar a instalação já dentro de um repositório Git e escolher qual assistente será oferecido ao final:
 
 ```bash
 cd ~/workspace/meu-projeto
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh \
   | bash -s -- --launch-aider
 
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh \
   | bash -s -- --launch-opencode
 ```
 
 Antes de baixar imagens ou modelos, o instalador verifica Linux/WSL2, RAM, VRAM, GPU NVIDIA, espaço em disco, Docker, Compose e dependências do host. Em seguida, ele:
 
 - instala dependências básicas ausentes em sistemas com `apt` após confirmação;
-- clona ou atualiza a stack em `~/.local/share/local-coding-ai`;
+- clona ou atualiza a stack em `~/.local/share/localhost-ai`;
 - valida ou configura o NVIDIA Container Toolkit quando há uma GPU compatível;
 - instala o Aider com `pipx` e o OpenCode no diretório do usuário;
 - gera e instala o certificado local de `https://ai.localhost` com `mkcert`;
 - sobe a stack em CPU ou GPU;
 - escolhe e baixa um modelo Qwen geral e outro voltado a código;
-- instala e valida Aider e OpenCode como assistentes de primeira classe, sem selecionar um deles como padrão;
-- instala o comando global `ai.localhost`, que elimina a necessidade de exportar `OLLAMA_API_BASE` ou repetir o nome do modelo.
+- instala e valida os comandos OpenCode e Aider, preservando as duas experiências disponíveis nesta versão;
+- instala o comando global `localhost.ai`, que elimina a necessidade de exportar `OLLAMA_API_BASE` ou repetir o nome do modelo.
 
-Durante a execução, o instalador mantém um manifesto em `~/.local/state/local-coding-ai`. Ele registra o que já existia e o que foi adicionado pelo projeto para permitir uma desinstalação completa sem remover ferramentas compartilhadas que já estavam na máquina.
+Durante a execução, o instalador mantém um manifesto em `~/.local/state/localhost-ai`. Ele registra o que já existia e o que foi adicionado pelo projeto para permitir uma desinstalação completa sem remover ferramentas compartilhadas que já estavam na máquina.
 
 A seleção automática prioriza a geração Qwen mais recente que caiba de maneira razoável na RAM/VRAM detectada. Atualmente, ela usa Qwen 3.6 em máquinas grandes, Qwen 3.5 nos demais perfis e Qwen3-Coder ou Qwen2.5-Coder para programação. As famílias e tamanhos podem ser conferidos no catálogo oficial do [Qwen 3.6](https://ollama.com/library/qwen3.6), [Qwen 3.5](https://ollama.com/library/qwen3.5) e [Qwen3-Coder](https://ollama.com/library/qwen3-coder).
 
@@ -222,41 +221,41 @@ Opções úteis:
 
 ```bash
 # Diagnóstico sem alterações ou downloads.
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh \
   | bash -s -- --check-only
 
 # Instalação sem abrir um assistente ao final (também é o padrão).
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh \
   | bash -s -- --no-launch
 ```
 
 É possível substituir a seleção automática:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh \
   | bash -s -- \
       --general-model qwen3.5:9b \
       --code-model qwen2.5-coder:7b \
-      --aider-model qwen3.5:9b \
+      --aider-model qwen2.5-coder:7b \
       --opencode-model qwen2.5-coder:7b
 ```
 
 Para revisar o instalador antes de executá-lo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh -o /tmp/ai-localhost-install.sh
-less /tmp/ai-localhost-install.sh
-bash /tmp/ai-localhost-install.sh
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh -o /tmp/localhost-ai-install.sh
+less /tmp/localhost-ai-install.sh
+bash /tmp/localhost-ai-install.sh
 ```
 
 ## Desinstalação Completa
 
-> **Atenção:** a desinstalação apaga definitivamente os modelos baixados, as conversas do Open WebUI e os demais dados armazenados nos volumes Docker.
+> **Atenção:** a desinstalação apaga definitivamente os modelos baixados, as conversas do Open WebUI e os demais dados armazenados nos volumes Docker. O repositório ainda não possui backup/restore integrado; faça uma exportação adequada antes de remover uma instalação que contenha dados importantes.
 
 Confira primeiro o que seria removido, sem alterar a máquina:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/uninstall.sh \
   | bash -s -- --dry-run
 ```
 
@@ -270,13 +269,13 @@ Em um checkout local, os comandos equivalentes são:
 Execute a desinstalação completa:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/uninstall.sh | bash
 ```
 
 Para uso não interativo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh \
+curl -fsSL https://raw.githubusercontent.com/gut0leao/localhost.ai/main/uninstall.sh \
   | bash -s -- --yes
 ```
 
@@ -285,11 +284,11 @@ O desinstalador usa o manifesto para:
 - remover containers, rede, volumes, modelos, conversas e imagens baixadas pelo instalador;
 - remover o certificado de `ai.localhost` e desfazer a confiança da CA do `mkcert` quando ela foi criada pelo projeto, inclusive no armazenamento do usuário Windows quando configurado pelo WSL;
 - desinstalar o Aider e o OpenCode somente se foram instalados pelo projeto;
-- remover `ai.localhost` e restaurar qualquer launcher ou configuração anterior;
+- remover `localhost.ai` e restaurar qualquer launcher ou configuração anterior;
 - remover somente os pacotes APT que não estavam instalados antes;
 - restaurar `/etc/docker/daemon.json` e os arquivos do repositório NVIDIA quando o instalador os alterou;
 - restaurar o `.env`, certificados e revisão Git anteriores quando a stack já existia;
-- apagar o checkout em `~/.local/share/local-coding-ai` somente quando ele foi clonado pelo instalador.
+- apagar o checkout em `~/.local/share/localhost-ai` somente quando ele foi clonado pelo instalador.
 
 O Docker, o Docker Compose, o driver NVIDIA e o próprio WSL não são removidos, pois são pré-requisitos e não são instalados pelo projeto. Em instalações antigas que não possuem manifesto, o script remove os recursos próprios da stack, mas preserva Aider, OpenCode, CA, pacotes APT e configuração NVIDIA por não conseguir determinar com segurança sua origem.
 
@@ -300,8 +299,8 @@ Depois da desinstalação, abra um novo terminal antes de testar novamente o ins
 Clone o repositório e entre na pasta:
 
 ```bash
-git clone https://github.com/gut0leao/ai.localhost.git
-cd ai.localhost
+git clone https://github.com/gut0leao/localhost.ai.git
+cd localhost.ai
 ```
 
 Crie o arquivo de configuração local:
@@ -318,7 +317,7 @@ sed -n '1,120p' .env
 
 ## Primeiro Uso após Instalação Manual
 
-Esta seção se aplica somente a quem clonou e configurou o projeto manualmente. Se você utilizou o instalador automatizado, o HTTPS, a stack e os modelos já foram preparados; entre em um repositório Git e execute `ai.localhost`.
+Esta seção se aplica somente a quem clonou e configurou o projeto manualmente. Se você utilizou o instalador automatizado, o HTTPS, a stack e os modelos já foram preparados; `localhost.ai --help` mostra as opções de integração, enquanto `aider` e `opencode` abrem os assistentes dentro de um repositório Git.
 
 Configure o certificado HTTPS local:
 
@@ -395,6 +394,8 @@ make up-gpu   # GPU NVIDIA
 Execute apenas um dos dois comandos de inicialização, conforme o modo desejado.
 
 Se quiser revisar as mudanças das imagens, consulte a documentação oficial dos projetos antes de atualizar ambientes importantes.
+
+As imagens atuais usam tags móveis. Portanto, esse procedimento pode incorporar mudanças upstream sem que o conteúdo do repositório tenha mudado e ainda não oferece rollback automatizado. Preserve dados importantes antes de atualizar.
 
 ## Como Baixar Modelos
 
@@ -548,7 +549,7 @@ Observação: usar SearXNG permite buscar na web sem API paga, mas ainda há tr�
 
 ## Assistentes de Programação no Host/WSL
 
-O Aider e o OpenCode não rodam em containers neste projeto. O instalador instala e valida ambos no host/WSL: Aider com `pipx` e OpenCode no diretório do usuário. Nenhum deles é o padrão do comando `ai.localhost`; a escolha é sempre explícita.
+OpenCode e Aider não rodam em containers neste projeto. O instalador atual instala e valida ambos no host/WSL: OpenCode oferece a experiência de agente mais abrangente e é o principal candidato para o papel de ferramenta de desenvolvimento; Aider permanece uma alternativa direta e útil. Há sobreposição entre eles, e a escolha continua explícita. Perfis que instalem apenas a opção desejada são uma evolução planejada, não um comportamento existente.
 
 Para uma instalação manual do Aider no Ubuntu executado pelo WSL:
 
@@ -580,9 +581,9 @@ opencode --model ollama/qwen2.5-coder:7b
 aider --message "explique a arquitetura deste projeto"
 ```
 
-As integrações são funções de shell instaladas no arquivo de inicialização do Bash ou Zsh atual. Elas preservam `aider --help`, `aider --version`, `opencode --help` e `opencode --version` como comandos nativos. A configuração da stack fica em `~/.config/local-coding-ai/stack-dir`, enquanto os modelos escolhidos ficam no `.env` da instalação. Para abrir um projeto diferente, passar opções administrativas do OpenCode ou ignorar a integração, use `ai.localhost --aider|--opencode` ou `command aider` e `command opencode`.
+As integrações são funções de shell instaladas no arquivo de inicialização do Bash ou Zsh atual. Elas preservam `aider --help`, `aider --version`, `opencode --help` e `opencode --version` como comandos nativos. A configuração da stack fica em `~/.config/localhost-ai/stack-dir`, enquanto os modelos escolhidos ficam no `.env` da instalação. Para ignorar a integração, use `command aider` ou `command opencode`; as opções recebidas pelos comandos diretos são encaminhadas às ferramentas.
 
-Ao iniciar, o comando sempre mostra um resumo curto com a URL da interface web, projeto e modelo ativos e os comandos para usar o modelo de código, baixar ou selecionar outro modelo e abrir outro projeto. A ajuda completa permanece disponível em `ai.localhost --help`.
+Ao iniciar, o comando sempre mostra um resumo curto com a URL da interface web, projeto e modelo ativos e os comandos para usar o modelo de código, baixar ou selecionar outro modelo e abrir outro projeto. A ajuda completa permanece disponível em `localhost.ai --help`.
 
 Se a instalação foi feita manualmente, ainda é possível usar o Aider sem o comando auxiliar:
 
@@ -600,7 +601,7 @@ aider
 opencode
 ```
 
-A configuração inicial do OpenCode fica em `~/.config/opencode/opencode.json`. Ela conecta apenas a API local `http://127.0.0.1:11434`, oferece os modelos Qwen usados pelo instalador e pede confirmação antes de editar arquivos, executar comandos, chamar subagentes ou acessar skills. Leitura de arquivos `.env` é bloqueada; busca e coleta web também começam bloqueadas. Se já existir uma configuração do OpenCode, o instalador a preserva e não a substitui.
+A configuração gerada para o OpenCode fica em `~/.config/opencode/opencode.json`. Ela conecta a API local `http://127.0.0.1:11434`, oferece os modelos Qwen usados pelo instalador e pede confirmação antes de editar arquivos, executar comandos, chamar subagentes ou acessar skills. Leitura de arquivos `.env` é bloqueada; busca e coleta web também começam bloqueadas. Se já existir uma configuração do OpenCode, o instalador a preserva e não a substitui; nesse caso, confirme manualmente o provedor e as permissões, pois os defaults locais do projeto não são aplicados.
 
 Os modelos continuam pertencendo ao Ollama: nenhum dos dois assistentes mantém uma cópia, nem faz download paralelo. Após a instalação, as configurações usam os dois modelos escolhidos para a máquina:
 
@@ -613,10 +614,10 @@ Os modelos continuam pertencendo ao Ollama: nenhum dos dois assistentes mantém 
 
 No Aider, `code` é o modo inicial; use `/ask` para conversar sem editar e `/architect` para o fluxo arquiteto/editor. Os aliases `/model local-chat` e `/model local-code` deixam os dois modelos disponíveis durante a sessão. No OpenCode, `Build` é o agente inicial e `Plan` usa o modelo geral; alterne entre eles com `Tab`. O comando direto `opencode` usa essa configuração global; ele não relê o `.env` automaticamente.
 
-Para selecionar outro modelo local no OpenCode, use o seletor `/models` ou abra pelo comando auxiliar com o identificador do Ollama:
+Para selecionar outro modelo local no OpenCode, use o seletor `/models` ou informe o identificador do Ollama:
 
 ```bash
-ai.localhost --opencode --model ollama/qwen2.5-coder:7b
+opencode --model ollama/qwen2.5-coder:7b
 ```
 
 Para atualizar o OpenCode no futuro, execute o instalador oficial dentro do WSL. Ele não requer `sudo`:
@@ -625,9 +626,34 @@ Para atualizar o OpenCode no futuro, execute o instalador oficial dentro do WSL.
 curl -fsSL https://opencode.ai/install | bash
 ```
 
+## Dados, RAG e Persistência
+
+O ambiente separa dados persistentes dos containers descartáveis. Os nomes físicos dos volumes recebem um prefixo do projeto Compose, mas os papéis são estes:
+
+| Dado | Local atual | Observação |
+| --- | --- | --- |
+| Modelos Ollama | volume Docker `ollama-models` | Podem ser grandes e, em geral, podem ser baixados novamente. |
+| Conversas, usuários, uploads e índices do Open WebUI | volume Docker `open-webui-data` | Contém dados únicos; remover o volume causa perda. |
+| Configuração principal da stack | `.env` no diretório de instalação | Pode conter decisões locais e não deve ser versionada. |
+| Configuração gerada do OpenCode | `~/.config/opencode/opencode.json` | Uma configuração preexistente é preservada pelo instalador. |
+| Histórico local do Aider | arquivos `.aider*` no repositório em uso | Pode conter prompts e respostas; defina a política de versionamento do projeto de destino. |
+| Referência à instalação usada pelos launchers | `~/.config/localhost-ai/stack-dir` | Permite que os comandos encontrem a stack. |
+| Manifesto e cópias de segurança operacionais do instalador | `~/.local/state/localhost-ai` | Serve à reversão da instalação; não é backup dos chats ou modelos. |
+| Certificado de `ai.localhost` | `certs/` no diretório de instalação | A CA e sua chave são administradas separadamente pelo `mkcert`. |
+
+O Compose não monta automaticamente uma coleção de documentos pessoais no Open WebUI. Arquivos enviados pela interface passam a ser gerenciados nos dados persistentes do próprio Open WebUI e podem gerar índices de RAG no mesmo volume; detalhes internos podem variar entre versões upstream.
+
+Para preservar a fonte primária de documentos, mantenha três áreas conceitualmente separadas:
+
+1. **originais:** diretório sob controle do usuário, fora da área de trabalho das ferramentas e preferencialmente somente leitura para o fluxo de IA;
+2. **ingestão:** cópias selecionadas e descartáveis, preparadas para upload ou indexação;
+3. **dados gerados:** embeddings, índices, metadados e conversas mantidos no volume do Open WebUI.
+
+Essa separação é uma recomendação operacional; o projeto ainda não a aplica por permissões nem oferece backup/restore integrado. Antes de atualizar de forma relevante, migrar ou desinstalar, exporte os dados importantes pelo mecanismo suportado pelo componente ou faça uma cópia consistente dos volumes. Um artefato transportável de backup e restauração testada está no [roadmap](docs/ROADMAP.md).
+
 ## Privacidade e Segurança
 
-Por padrão:
+### Controles implementados
 
 - As portas são vinculadas a `127.0.0.1`.
 - O Open WebUI não publica sua porta interna diretamente; o acesso passa pelo proxy reverso local.
@@ -636,10 +662,16 @@ Por padrão:
 - Não há montagem de `/home`, `~/.ssh`, `/var/run/docker.sock` ou repositórios pessoais.
 - Modelos e dados ficam em volumes nomeados do Docker.
 - O Aider roda no host/WSL e conversa com o Ollama local.
-- O OpenCode roda no host/WSL e conversa somente com o Ollama local; sua configuração inicial não habilita provedores externos.
+- A configuração gerada pelo projeto para o OpenCode usa o Ollama local, não habilita provedores externos e restringe ferramentas sensíveis.
 - Os scripts auxiliares leem `.env` como arquivo de configuração e ignoram linhas inválidas, sem executar comandos definidos nele.
 
 O serviço `ollama` usa o usuário padrão da imagem oficial. Isso é aceito aqui porque não há montagem de diretórios sensíveis, as portas ficam em localhost e o container não é privilegiado.
+
+### Limitações e conectividade externa
+
+Esses controles reduzem exposição acidental, mas não formam uma barreira de isolamento. Containers e processos no host continuam tecnicamente capazes de acessar a Internet; downloads de imagens, modelos, pacotes e atualizações dependem dessa conectividade. O SearXNG consulta fontes externas quando ativado, e plugins, ferramentas ou configurações adicionados pelo usuário podem mudar o comportamento de rede dos assistentes.
+
+O projeto ainda não aplica política de egress, não inventaria toda telemetria upstream, não verifica assinaturas/SBOM e não fornece auditoria automatizada. O usuário continua responsável pelas políticas da organização, classificação dos dados, atualizações do host e avaliação dos componentes utilizados. Controles adicionais estão descritos como direção futura no [roadmap](docs/ROADMAP.md), não como garantias atuais.
 
 Se houver problema de permissão em volumes, investigue o dono e o modo do volume antes de aplicar correções. Não use `chmod 777`.
 
@@ -750,7 +782,7 @@ make logs
 
 Confirme que `OLLAMA_BASE_URL` está como `http://ollama:11434` no Compose.
 
-### O comando `ai.localhost` não é encontrado
+### O comando `localhost.ai` não é encontrado
 
 Confirme que `~/.local/bin` está no `PATH` e recarregue o shell:
 
@@ -765,7 +797,7 @@ Se o arquivo ainda não existir, execute novamente o instalador. Em um checkout 
 ./install.sh --no-launch
 ```
 
-### A interface `ai.localhost` não abre
+### A interface em `ai.localhost` não abre
 
 Teste o proxy e consulte seus logs:
 
@@ -826,7 +858,8 @@ Evite permissões abertas. Primeiro identifique o volume:
 
 ```bash
 docker volume ls
-docker volume inspect local-coding-ai_ollama-models
+docker compose config --volumes
+docker volume ls --filter name=ollama-models
 ```
 
 Depois aplique apenas a correção mínima necessária conforme o erro encontrado.
@@ -949,10 +982,7 @@ Referências oficiais recomendadas:
 
 ## Roadmap Futuro
 
-- Presets de modelos por memória disponível.
-- Healthchecks.
-- Scripts de bootstrap offline.
-- Documentação de embeddings locais.
+As próximas prioridades são reprodutibilidade de versões, inventário e migração de dados, diagnóstico (`doctor`), backup/restore, atualização segura, controles de privacidade, perfis de instalação, RAG com separação de documentos e auditoria. A ordem, o escopo e o que já existe estão detalhados no [roadmap do projeto](docs/ROADMAP.md).
 
 ## Licença
 

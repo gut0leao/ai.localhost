@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_STACK_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
-CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/local-coding-ai"
+DEFAULT_STACK_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/localhost-ai"
+LEGACY_STACK_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
+CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/localhost-ai"
+LEGACY_CONFIG_DIR="${XDG_CONFIG_HOME:-${HOME}/.config}/local-coding-ai"
 STACK_DIR_FILE="${CONFIG_DIR}/stack-dir"
-STACK_DIR="${LOCAL_AI_INSTALL_DIR:-}"
+LEGACY_STACK_DIR_FILE="${LEGACY_CONFIG_DIR}/stack-dir"
+STACK_DIR="${LOCALHOST_AI_INSTALL_DIR:-${LOCAL_AI_INSTALL_DIR:-}}"
 PROJECT_DIR="${PWD}"
 CLIENT=""
 START_STACK=true
@@ -18,12 +21,12 @@ fail() {
 
 usage() {
   cat <<'EOF'
-Assistente local de programação
+Assistente local de programação do localhost.ai
 
 Uso:
-  ai.localhost --aider [opções do Aider]
-  ai.localhost --opencode [opções do OpenCode]
-  ai.localhost --project /caminho/do/repositorio [opções]
+  localhost.ai --aider [opções do Aider]
+  localhost.ai --opencode [opções do OpenCode]
+  localhost.ai --project /caminho/do/repositorio [opções]
 
 Opções do ambiente:
   --aider            Abre o Aider.
@@ -33,8 +36,8 @@ Opções do ambiente:
   -h, --help         Exibe esta ajuda.
 
 As demais opções são encaminhadas à ferramenta selecionada. Por exemplo:
-  ai.localhost --message "explique este projeto"
-  ai.localhost --model ollama_chat/outro-modelo
+  localhost.ai --message "explique este projeto"
+  localhost.ai --model ollama_chat/outro-modelo
 EOF
 }
 
@@ -44,16 +47,16 @@ show_startup_guide() {
 
   cat <<EOF
 Ambiente local de IA
-  Interface web: https://ai.localhost
+  Interface web local: https://ai.localhost
   Projeto:       ${PROJECT_DIR}
   Modelo:        ${model}
 
 Atalhos úteis
-  Abrir Aider:       ai.localhost --aider
-  Abrir OpenCode:    ai.localhost --opencode
-  Escolher modelo:   ai.localhost --model <modelo>
+  Abrir Aider:       localhost.ai --aider
+  Abrir OpenCode:    localhost.ai --opencode
+  Escolher modelo:   localhost.ai --model <modelo>
   Baixar modelo:     make -C "${STACK_DIR}" pull-model MODEL=<modelo>
-  Todas as opções:   ai.localhost --help
+  Todas as opções:   localhost.ai --help
 
 Abrindo o ${client_name}...
 
@@ -81,6 +84,10 @@ resolve_stack_dir() {
     STACK_DIR="${repository_root}"
   elif [[ -r "${STACK_DIR_FILE}" ]]; then
     IFS= read -r STACK_DIR <"${STACK_DIR_FILE}"
+  elif [[ -r "${LEGACY_STACK_DIR_FILE}" ]]; then
+    IFS= read -r STACK_DIR <"${LEGACY_STACK_DIR_FILE}"
+  elif [[ -f "${LEGACY_STACK_DIR}/docker-compose.yml" ]]; then
+    STACK_DIR="${LEGACY_STACK_DIR}"
   else
     STACK_DIR="${DEFAULT_STACK_DIR}"
   fi
@@ -135,7 +142,8 @@ start_stack() {
   local runtime
 
   [[ "${START_STACK}" == true ]] || return 0
-  runtime="$(env_value LOCAL_AI_RUNTIME)"
+  runtime="$(env_value LOCALHOST_AI_RUNTIME)"
+  runtime="${runtime:-$(env_value LOCAL_AI_RUNTIME)}"
   if [[ -z "${runtime}" ]] && command -v nvidia-smi >/dev/null 2>&1 \
     && nvidia-smi >/dev/null 2>&1; then
     runtime="gpu"
@@ -143,7 +151,7 @@ start_stack() {
   if make -C "${STACK_DIR}" test-ollama >/dev/null 2>&1 \
     && make -C "${STACK_DIR}" test-open-webui >/dev/null 2>&1 \
     && { [[ "${runtime}" != "gpu" ]] \
-      || docker inspect ai-ollama --format '{{json .HostConfig.DeviceRequests}}' 2>/dev/null \
+      || docker inspect localhost-ai-ollama --format '{{json .HostConfig.DeviceRequests}}' 2>/dev/null \
         | grep -q 'nvidia'; }; then
     return 0
   fi
@@ -173,7 +181,7 @@ main() {
   local ollama_port
 
   parse_args "$@"
-  [[ -n "${CLIENT}" ]] || fail "escolha o assistente: ai.localhost --aider ou ai.localhost --opencode"
+  [[ -n "${CLIENT}" ]] || fail "escolha o assistente: localhost.ai --aider ou localhost.ai --opencode"
   resolve_stack_dir
 
   [[ -f "${STACK_DIR}/docker-compose.yml" && -f "${STACK_DIR}/.env" ]] \
@@ -210,7 +218,8 @@ main() {
   [[ "${aider_editor_model}" == */* ]] || aider_editor_model="ollama_chat/${aider_editor_model}"
   ollama_port="$(env_value OLLAMA_PORT)"
   export OLLAMA_API_BASE="http://localhost:${ollama_port:-11434}"
-  local_ai_ca_bundle="$(env_value LOCAL_AI_CA_BUNDLE)"
+  local_ai_ca_bundle="$(env_value LOCALHOST_AI_CA_BUNDLE)"
+  local_ai_ca_bundle="${local_ai_ca_bundle:-$(env_value LOCAL_AI_CA_BUNDLE)}"
   local_ai_ca_bundle="${local_ai_ca_bundle:-/etc/ssl/certs/ca-certificates.crt}"
   if [[ -r "${local_ai_ca_bundle}" ]]; then
     export SSL_CERT_FILE="${SSL_CERT_FILE:-${local_ai_ca_bundle}}"

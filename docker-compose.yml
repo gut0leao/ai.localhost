@@ -4,12 +4,12 @@ x-ca-env: &ca-env
   CURL_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt"
 
 x-ca-volume: &ca-volume
-  "${LOCAL_AI_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}:/etc/ssl/certs/ca-certificates.crt:ro"
+  "${LOCALHOST_AI_CA_BUNDLE:-${LOCAL_AI_CA_BUNDLE:-/etc/ssl/certs/ca-certificates.crt}}:/etc/ssl/certs/ca-certificates.crt:ro"
 
 services:
   ollama:
     image: ollama/ollama:latest
-    container_name: ai-ollama
+    container_name: localhost-ai-ollama
     restart: unless-stopped
     environment:
       <<: *ca-env
@@ -21,7 +21,7 @@ services:
 
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
-    container_name: ai-open-webui
+    container_name: localhost-ai-open-webui
     restart: unless-stopped
     depends_on:
       - ollama
@@ -52,12 +52,12 @@ services:
 
   reverse-proxy:
     image: caddy:2-alpine
-    container_name: ai-reverse-proxy
+    container_name: localhost-ai-reverse-proxy
     restart: unless-stopped
     depends_on:
       - open-webui
     environment:
-      AI_HOSTNAME: "${AI_HOSTNAME:-ai.localhost}"
+      LOCALHOST_AI_HOSTNAME: "${LOCALHOST_AI_HOSTNAME:-${AI_HOSTNAME:-ai.localhost}}"
       AI_HTTPS_PORT: "${AI_HTTPS_PORT:-443}"
     ports:
       - "${AI_BIND_HOST:-127.0.0.1}:${AI_HTTP_PORT:-80}:80"
@@ -72,7 +72,7 @@ services:
 
   searxng:
     image: docker.io/searxng/searxng:latest
-    container_name: ai-searxng
+    container_name: localhost-ai-searxng
     restart: unless-stopped
     profiles:
       - web-search

@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY_URL="https://github.com/gut0leao/ai.localhost.git"
-LEGACY_REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
-RAW_INSTALLER_URL="https://raw.githubusercontent.com/gut0leao/ai.localhost/main/install.sh"
-DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/local-coding-ai"
-STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/local-coding-ai"
-INSTALL_DIR="${LOCAL_AI_INSTALL_DIR:-${DEFAULT_INSTALL_DIR}}"
-PROJECT_DIR="${LOCAL_AI_PROJECT_DIR:-${AIDER_PROJECT_DIR:-${PWD}}}"
-GENERAL_MODEL="${LOCAL_AI_GENERAL_MODEL:-}"
-CODE_MODEL="${LOCAL_AI_CODE_MODEL:-}"
-AIDER_MODEL="${LOCAL_AI_AIDER_MODEL:-}"
-OPENCODE_MODEL="${LOCAL_AI_OPENCODE_MODEL:-}"
-AI_COMMAND_PATH="${HOME}/.local/bin/ai.localhost"
+REPOSITORY_URL="https://github.com/gut0leao/localhost.ai.git"
+LEGACY_REPOSITORY_URL="https://github.com/gut0leao/ai.localhost.git"
+OLDER_LEGACY_REPOSITORY_URL="https://github.com/gut0leao/local-coding-ai.git"
+RAW_INSTALLER_URL="https://raw.githubusercontent.com/gut0leao/localhost.ai/main/install.sh"
+DEFAULT_INSTALL_DIR="${XDG_DATA_HOME:-${HOME}/.local/share}/localhost-ai"
+STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/localhost-ai"
+LEGACY_STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/local-coding-ai"
+INSTALL_DIR="${LOCALHOST_AI_INSTALL_DIR:-${LOCAL_AI_INSTALL_DIR:-${DEFAULT_INSTALL_DIR}}}"
+PROJECT_DIR="${LOCALHOST_AI_PROJECT_DIR:-${LOCAL_AI_PROJECT_DIR:-${AIDER_PROJECT_DIR:-${PWD}}}}"
+GENERAL_MODEL="${LOCALHOST_AI_GENERAL_MODEL:-${LOCAL_AI_GENERAL_MODEL:-}}"
+CODE_MODEL="${LOCALHOST_AI_CODE_MODEL:-${LOCAL_AI_CODE_MODEL:-}}"
+AIDER_MODEL="${LOCALHOST_AI_AIDER_MODEL:-${LOCAL_AI_AIDER_MODEL:-}}"
+OPENCODE_MODEL="${LOCALHOST_AI_OPENCODE_MODEL:-${LOCAL_AI_OPENCODE_MODEL:-}}"
+AI_COMMAND_PATH="${HOME}/.local/bin/localhost.ai"
 OPENCODE_BINARY_PATH="${HOME}/.opencode/bin/opencode"
 OPENCODE_COMMAND_PATH="${HOME}/.local/bin/opencode"
 OPENCODE_CONFIG_PATH="${XDG_CONFIG_HOME:-${HOME}/.config}/opencode/opencode.json"
@@ -57,6 +59,20 @@ init_install_state() {
   fi
   printf '1\n' >"${STATE_DIR}/format-version"
   printf '%s\n' "${INSTALL_DIR}" >"${STATE_DIR}/install-dir"
+}
+
+reuse_legacy_installation() {
+  local legacy_install_dir
+
+  [[ -z "${SCRIPT_ROOT}" ]] || return 0
+  [[ "${INSTALL_DIR}" == "${DEFAULT_INSTALL_DIR}" ]] || return 0
+  [[ -r "${LEGACY_STATE_DIR}/format-version" && -r "${LEGACY_STATE_DIR}/install-dir" ]] || return 0
+
+  IFS= read -r legacy_install_dir <"${LEGACY_STATE_DIR}/install-dir"
+  [[ -n "${legacy_install_dir}" ]] || return 0
+  STATE_DIR="${LEGACY_STATE_DIR}"
+  INSTALL_DIR="${legacy_install_dir}"
+  warn "reutilizando instalação anterior em ${INSTALL_DIR}; os diretórios legados serão preservados"
 }
 
 record_new_apt_packages() {
@@ -121,7 +137,7 @@ fail() {
 
 usage() {
   cat <<EOF
-Instalador do ai.localhost
+Instalador do localhost.ai
 
 Uso local:
   ./install.sh [opções]
@@ -144,9 +160,10 @@ Opções:
   --opencode-model MODELO Sobrescreve o modelo usado para abrir o OpenCode.
   -h, --help             Exibe esta ajuda.
 
-As mesmas opções de modelos podem ser definidas por LOCAL_AI_GENERAL_MODEL,
-LOCAL_AI_CODE_MODEL, LOCAL_AI_AIDER_MODEL e LOCAL_AI_OPENCODE_MODEL. LOCAL_AI_INSTALL_DIR e
-LOCAL_AI_PROJECT_DIR também são aceitas; AIDER_PROJECT_DIR permanece compatível com instalações anteriores.
+As mesmas opções de modelos podem ser definidas por LOCALHOST_AI_GENERAL_MODEL,
+LOCALHOST_AI_CODE_MODEL, LOCALHOST_AI_AIDER_MODEL e LOCALHOST_AI_OPENCODE_MODEL.
+LOCALHOST_AI_INSTALL_DIR e LOCALHOST_AI_PROJECT_DIR também são aceitas. As variáveis
+LOCAL_AI_* e AIDER_PROJECT_DIR permanecem compatíveis com instalações anteriores.
 EOF
 }
 
@@ -347,7 +364,7 @@ check_docker() {
 
 check_network() {
   curl --fail --silent --show-error --head --max-time 15 \
-    https://github.com/gut0leao/ai.localhost >/dev/null \
+    https://github.com/gut0leao/localhost.ai >/dev/null \
     || fail "não foi possível acessar o repositório no GitHub"
   curl --fail --silent --show-error --head --max-time 15 \
     https://ollama.com >/dev/null \
@@ -367,13 +384,13 @@ check_required_ports() {
 
   while read -r port expected_container; do
     if port_is_listening "${port}" \
-      && ! docker ps --format '{{.Names}}' | grep -qx "${expected_container}"; then
+      && ! docker ps --format '{{.Names}}' | grep -Eq "^(${expected_container})$"; then
       fail "a porta local ${port} já está em uso por outro serviço"
     fi
   done <<'EOF'
-80 ai-reverse-proxy
-443 ai-reverse-proxy
-11434 ai-ollama
+80 localhost-ai-reverse-proxy|ai-reverse-proxy
+443 localhost-ai-reverse-proxy|ai-reverse-proxy
+11434 localhost-ai-ollama|ai-ollama
 EOF
 }
 
@@ -512,8 +529,8 @@ prepare_repository() {
 
   if [[ -d "${INSTALL_DIR}/.git" ]]; then
     case "$(git -C "${INSTALL_DIR}" remote get-url origin 2>/dev/null || true)" in
-      "${REPOSITORY_URL}"|"${LEGACY_REPOSITORY_URL}"|git@github.com:gut0leao/ai.localhost.git|git@github.com:gut0leao/local-coding-ai.git) ;;
-      *) fail "o checkout em ${INSTALL_DIR} não pertence ao projeto ai.localhost" ;;
+      "${REPOSITORY_URL}"|"${LEGACY_REPOSITORY_URL}"|"${OLDER_LEGACY_REPOSITORY_URL}"|git@github.com:gut0leao/localhost.ai.git|git@github.com:gut0leao/ai.localhost.git|git@github.com:gut0leao/local-coding-ai.git) ;;
+      *) fail "o checkout em ${INSTALL_DIR} não pertence ao projeto localhost.ai" ;;
     esac
     if [[ -n "$(git -C "${INSTALL_DIR}" status --porcelain)" ]]; then
       fail "o checkout em ${INSTALL_DIR} possui alterações locais; revise-as antes de atualizar"
@@ -527,7 +544,7 @@ prepare_repository() {
   elif [[ -e "${INSTALL_DIR}" ]]; then
     fail "${INSTALL_DIR} já existe, mas não é um checkout deste projeto"
   else
-    info "Clonando ai.localhost"
+    info "Clonando localhost.ai"
     mkdir -p "$(dirname "${INSTALL_DIR}")"
     git clone --depth 1 "${REPOSITORY_URL}" "${INSTALL_DIR}"
     state_mark checkout-created
@@ -558,19 +575,19 @@ configure_environment() {
   set_env_value "${env_file}" OLLAMA_CODE_MODEL_DEFAULT "${CODE_MODEL}"
   set_env_value "${env_file}" OLLAMA_AIDER_MODEL_DEFAULT "${AIDER_MODEL}"
   set_env_value "${env_file}" OLLAMA_OPENCODE_MODEL_DEFAULT "${OPENCODE_MODEL}"
-  set_env_value "${env_file}" LOCAL_AI_CA_BUNDLE "/etc/ssl/certs/ca-certificates.crt"
+  set_env_value "${env_file}" LOCALHOST_AI_CA_BUNDLE "/etc/ssl/certs/ca-certificates.crt"
   set_env_value "${env_file}" SEARXNG_QUERY_URL "'http://searxng:8080/search?q=<query>'"
   if [[ "${GPU_AVAILABLE}" == true ]]; then
-    set_env_value "${env_file}" LOCAL_AI_RUNTIME "gpu"
+    set_env_value "${env_file}" LOCALHOST_AI_RUNTIME "gpu"
   else
-    set_env_value "${env_file}" LOCAL_AI_RUNTIME "cpu"
+    set_env_value "${env_file}" LOCALHOST_AI_RUNTIME "cpu"
   fi
-  set_env_value "${env_file}" AI_HOSTNAME "ai.localhost"
+  set_env_value "${env_file}" LOCALHOST_AI_HOSTNAME "ai.localhost"
   success "configuração gravada em ${env_file}"
 }
 
 install_ai_command() {
-  local config_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/local-coding-ai"
+  local config_dir="${XDG_CONFIG_HOME:-${HOME}/.config}/localhost-ai"
   local stack_dir_file="${config_dir}/stack-dir"
 
   mkdir -p "${HOME}/.local/bin" "${config_dir}"
@@ -578,16 +595,16 @@ install_ai_command() {
   printf '%s\n' "${stack_dir_file}" >"${STATE_DIR}/stack-dir-config-path"
   backup_user_file_once "${AI_COMMAND_PATH}" launcher
   backup_user_file_once "${stack_dir_file}" stack-dir-config
-  install -m 0755 "${INSTALL_DIR}/bin/ai.localhost" "${AI_COMMAND_PATH}"
+  install -m 0755 "${INSTALL_DIR}/bin/localhost.ai" "${AI_COMMAND_PATH}"
   printf '%s\n' "${INSTALL_DIR}" >"${stack_dir_file}"
   export PATH="${HOME}/.local/bin:${PATH}"
   ensure_user_bin_path
-  success "comando ai.localhost instalado em ${AI_COMMAND_PATH}"
+  success "comando localhost.ai instalado em ${AI_COMMAND_PATH}"
 }
 
 install_integrated_assistant_commands() {
   local shell_config
-  local marker_start="# >>> local-coding-ai assistants >>>"
+  local marker_start="# >>> localhost-ai assistants >>>"
 
   case "$(basename "${SHELL:-bash}")" in
     zsh) shell_config="${HOME}/.zshrc" ;;
@@ -602,20 +619,20 @@ install_integrated_assistant_commands() {
   fi
   {
     printf '\n%s\n' "${marker_start}"
-    printf '%s\n' '# Integra os comandos interativos ao Ollama local e à stack ai.localhost.'
+    printf '%s\n' '# Integra os comandos interativos ao Ollama local e à stack localhost.ai.'
     printf '%s\n' 'aider() {'
     printf '%s\n' '  case "${1:-}" in'
     printf '%s\n' '    -h|--help|-v|--version) command aider "$@" ;;'
-    printf '%s\n' '    *) command ai.localhost --aider "$@" ;;'
+    printf '%s\n' '    *) command localhost.ai --aider "$@" ;;'
     printf '%s\n' '  esac'
     printf '%s\n' '}'
     printf '%s\n' 'opencode() {'
     printf '%s\n' '  case "${1:-}" in'
     printf '%s\n' '    -h|--help|-v|--version|models|agent|providers|upgrade|uninstall|completion|mcp|debug) command opencode "$@" ;;'
-    printf '%s\n' '    *) command ai.localhost --opencode "$@" ;;'
+    printf '%s\n' '    *) command localhost.ai --opencode "$@" ;;'
     printf '%s\n' '  esac'
     printf '%s\n' '}'
-    printf '%s\n' '# <<< local-coding-ai assistants <<<'
+    printf '%s\n' '# <<< localhost-ai assistants <<<'
   } >>"${shell_config}"
   state_append_unique assistant-command-files "${shell_config}"
   success "comandos aider e opencode integrados ao shell ${shell_config}"
@@ -623,7 +640,7 @@ install_integrated_assistant_commands() {
 
 ensure_user_bin_path() {
   local shell_config
-  local marker_start="# >>> local-coding-ai PATH >>>"
+  local marker_start="# >>> localhost-ai PATH >>>"
 
   [[ "${USER_BIN_WAS_ON_PATH}" == false ]] || return 0
 
@@ -641,7 +658,7 @@ ensure_user_bin_path() {
   {
     printf '\n%s\n' "${marker_start}"
     printf '%s\n' 'export PATH="$HOME/.local/bin:$PATH"'
-    printf '%s\n' '# <<< local-coding-ai PATH <<<'
+    printf '%s\n' '# <<< localhost-ai PATH <<<'
   } >>"${shell_config}"
   state_append_unique path-files "${shell_config}"
 }
@@ -856,6 +873,10 @@ main() {
 
   parse_args "$@"
   detect_script_root
+  reuse_legacy_installation
+  if [[ -n "${SCRIPT_ROOT}" ]]; then
+    INSTALL_DIR="${SCRIPT_ROOT}"
+  fi
   detect_platform
   select_models
   collect_missing_packages missing_packages

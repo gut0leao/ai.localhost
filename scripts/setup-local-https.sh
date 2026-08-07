@@ -17,6 +17,7 @@ read_env_value() {
   fi
 }
 
+AI_HOSTNAME="${LOCALHOST_AI_HOSTNAME:-${AI_HOSTNAME:-$(read_env_value LOCALHOST_AI_HOSTNAME)}}"
 AI_HOSTNAME="${AI_HOSTNAME:-$(read_env_value AI_HOSTNAME)}"
 AI_HOSTNAME="${AI_HOSTNAME:-ai.localhost}"
 
