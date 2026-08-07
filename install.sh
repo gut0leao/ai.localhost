@@ -585,6 +585,42 @@ install_ai_command() {
   success "comando ai.localhost instalado em ${AI_COMMAND_PATH}"
 }
 
+install_integrated_assistant_commands() {
+  local shell_config
+  local marker_start="# >>> local-coding-ai assistants >>>"
+
+  case "$(basename "${SHELL:-bash}")" in
+    zsh) shell_config="${HOME}/.zshrc" ;;
+    *) shell_config="${HOME}/.bashrc" ;;
+  esac
+
+  if [[ -f "${shell_config}" ]] && grep -Fqx "${marker_start}" "${shell_config}"; then
+    return 0
+  fi
+  if [[ ! -e "${shell_config}" ]]; then
+    state_append_unique assistant-command-created-files "${shell_config}"
+  fi
+  {
+    printf '\n%s\n' "${marker_start}"
+    printf '%s\n' '# Integra os comandos interativos ao Ollama local e à stack ai.localhost.'
+    printf '%s\n' 'aider() {'
+    printf '%s\n' '  case "${1:-}" in'
+    printf '%s\n' '    -h|--help|-v|--version) command aider "$@" ;;'
+    printf '%s\n' '    *) command ai.localhost --aider "$@" ;;'
+    printf '%s\n' '  esac'
+    printf '%s\n' '}'
+    printf '%s\n' 'opencode() {'
+    printf '%s\n' '  case "${1:-}" in'
+    printf '%s\n' '    -h|--help|-v|--version|models|agent|providers|upgrade|uninstall|completion|mcp|debug) command opencode "$@" ;;'
+    printf '%s\n' '    *) command ai.localhost --opencode "$@" ;;'
+    printf '%s\n' '  esac'
+    printf '%s\n' '}'
+    printf '%s\n' '# <<< local-coding-ai assistants <<<'
+  } >>"${shell_config}"
+  state_append_unique assistant-command-files "${shell_config}"
+  success "comandos aider e opencode integrados ao shell ${shell_config}"
+}
+
 ensure_user_bin_path() {
   local shell_config
   local marker_start="# >>> local-coding-ai PATH >>>"
@@ -756,61 +792,28 @@ download_models() {
 }
 
 show_handoff() {
-  cat <<EOF
+  local bold=""
+  local cyan=""
+  local dim=""
+  local green=""
+  local reset=""
 
-============================================================
-Ambiente local de IA pronto
-============================================================
+  if [[ -t 1 ]]; then
+    bold=$'\033[1m'
+    cyan=$'\033[36m'
+    dim=$'\033[2m'
+    green=$'\033[32m'
+    reset=$'\033[0m'
+  fi
 
-Open WebUI:  https://ai.localhost
-Ollama API:  http://localhost:11434
-Modelo geral: ${GENERAL_MODEL}
-Modelo Aider: ${AIDER_MODEL}
-Modelo OpenCode: ${OPENCODE_MODEL}
-Stack:        ${INSTALL_DIR}
-
-Comandos úteis:
-  Abrir o Aider no repositório atual:
-    ai.localhost --aider
-
-  Abrir o OpenCode com o modelo de código:
-    ai.localhost --opencode
-
-  Abrir diretamente outro repositório:
-    ai.localhost --aider --project /caminho/do/projeto
-    ai.localhost --opencode --project /caminho/do/projeto
-
-  Baixar outro modelo:
-    make -C "${INSTALL_DIR}" pull-model MODEL=<modelo>
-
-  Listar modelos:
-    make -C "${INSTALL_DIR}" models
-
-  Ver containers:
-    make -C "${INSTALL_DIR}" ps
-
-  Ver logs:
-    make -C "${INSTALL_DIR}" logs
-
-  Testar o ambiente:
-    make -C "${INSTALL_DIR}" test-ollama
-    make -C "${INSTALL_DIR}" test-open-webui
-
-  Reiniciar com GPU:
-    make -C "${INSTALL_DIR}" restart-gpu
-
-  Parar o ambiente:
-    make -C "${INSTALL_DIR}" down
-
-  Simular a desinstalação completa:
-    curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh | bash -s -- --dry-run
-
-  Desinstalar completamente:
-    curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh | bash
-
-O Aider e o OpenCode serão abertos somente dentro de um repositório Git escolhido por você.
-============================================================
-EOF
+  printf '\n%s%s✓ Ambiente local de IA pronto%s\n' "${bold}" "${green}" "${reset}"
+  printf '  %sWeb%s      https://ai.localhost\n' "${cyan}" "${reset}"
+  printf '  %sModelos%s  chat: %s  código: %s\n' "${cyan}" "${reset}" "${GENERAL_MODEL}" "${CODE_MODEL}"
+  printf '\n%sNo repositório:%s\n' "${bold}" "${reset}"
+  printf '  %saider%s     %s# edição, conversa e arquiteto%s\n' "${green}" "${reset}" "${dim}" "${reset}"
+  printf '  %sopencode%s  %s# Build; Tab alterna para Plan%s\n' "${green}" "${reset}" "${dim}" "${reset}"
+  printf '\n%sGerenciar:%s  make -C "%s" {models,logs,ps,down}\n' \
+    "${bold}" "${reset}" "${INSTALL_DIR}"
 }
 
 resolve_launch_project() {
@@ -902,6 +905,7 @@ main() {
   start_stack
   download_models
   install_ai_command
+  install_integrated_assistant_commands
   show_handoff
   launch_assistant
 }

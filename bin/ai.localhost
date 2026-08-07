@@ -53,7 +53,6 @@ Atalhos úteis
   Abrir OpenCode:    ai.localhost --opencode
   Escolher modelo:   ai.localhost --model <modelo>
   Baixar modelo:     make -C "${STACK_DIR}" pull-model MODEL=<modelo>
-  Outro projeto:     ai.localhost --project /caminho/do/projeto
   Todas as opções:   ai.localhost --help
 
 Abrindo o ${client_name}...

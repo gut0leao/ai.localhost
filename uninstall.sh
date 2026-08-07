@@ -349,6 +349,25 @@ remove_path_entries() {
   done <"${STATE_DIR}/path-files"
 }
 
+remove_assistant_command_entries() {
+  local shell_file
+
+  [[ -r "${STATE_DIR}/assistant-command-files" ]] || return 0
+  while IFS= read -r shell_file; do
+    case "${shell_file}" in
+      "${HOME}/.bashrc"|"${HOME}/.zshrc"|"${HOME}/.profile") ;;
+      *) warn "arquivo de shell inesperado no manifesto; preservando ${shell_file}"; continue ;;
+    esac
+    if [[ -f "${shell_file}" ]]; then
+      sed -i '/^# >>> local-coding-ai assistants >>>$/,/^# <<< local-coding-ai assistants <<<$/{d;}' "${shell_file}"
+    fi
+    if grep -Fqx -- "${shell_file}" "${STATE_DIR}/assistant-command-created-files" 2>/dev/null \
+      && [[ -f "${shell_file}" ]] && ! grep -q '[^[:space:]]' "${shell_file}"; then
+      rm -f -- "${shell_file}"
+    fi
+  done <"${STATE_DIR}/assistant-command-files"
+}
+
 restore_user_configuration() {
   local launcher_path="${HOME}/.local/bin/ai.localhost"
   local stack_config_path="${XDG_CONFIG_HOME:-${HOME}/.config}/local-coding-ai/stack-dir"
@@ -372,6 +391,7 @@ restore_user_configuration() {
     restore_user_file "${stack_config_path}" stack-dir-config
     restore_user_file "${opencode_config_path}" opencode-config
     restore_user_file "${INSTALL_DIR}/.env" environment
+    remove_assistant_command_entries
     remove_path_entries
   else
     rm -f -- "${launcher_path}" "${stack_config_path}" "${opencode_config_path}"

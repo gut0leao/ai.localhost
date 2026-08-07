@@ -564,30 +564,23 @@ O comando `exec zsh -l` recarrega o shell para que o diretório de binários do 
 
 ## Como Usar Aider e OpenCode com Ollama Local
 
-O instalador cria o comando `ai.localhost`. Execute-o dentro de qualquer repositório Git; ele inicia a stack se necessário, define `OLLAMA_API_BASE` e abre o assistente escolhido com o modelo selecionado para a máquina:
+O instalador integra os comandos `aider` e `opencode` ao shell interativo. Dentro de qualquer repositório Git, eles iniciam a stack se necessário, definem a conexão com o Ollama local e abrem o assistente com o modelo selecionado para a máquina:
 
 ```bash
 cd ~/workspace/meu-projeto
-ai.localhost --aider
-ai.localhost --opencode
-```
-
-Abra outro repositório sem trocar antes de diretório:
-
-```bash
-ai.localhost --aider --project ~/workspace/outro-projeto
-ai.localhost --opencode --project ~/workspace/outro-projeto
+aider
+opencode
 ```
 
 Para escolher manualmente qualquer modelo já baixado ou encaminhar outras opções ao assistente escolhido:
 
 ```bash
-ai.localhost --aider --model ollama_chat/qwen3.5:9b
-ai.localhost --opencode --model ollama/qwen2.5-coder:7b
-ai.localhost --aider --message "explique a arquitetura deste projeto"
+aider --model ollama_chat/qwen3.5:9b
+opencode --model ollama/qwen2.5-coder:7b
+aider --message "explique a arquitetura deste projeto"
 ```
 
-O comando é um executável real, não um alias de shell. Por isso funciona da mesma forma no Bash e no Zsh. A configuração da stack fica em `~/.config/local-coding-ai/stack-dir`, enquanto os modelos escolhidos ficam no `.env` da instalação. Execute `ai.localhost --help` para ver as opções próprias; as demais opções são encaminhadas ao assistente escolhido.
+As integrações são funções de shell instaladas no arquivo de inicialização do Bash ou Zsh atual. Elas preservam `aider --help`, `aider --version`, `opencode --help` e `opencode --version` como comandos nativos. A configuração da stack fica em `~/.config/local-coding-ai/stack-dir`, enquanto os modelos escolhidos ficam no `.env` da instalação. Para abrir um projeto diferente, passar opções administrativas do OpenCode ou ignorar a integração, use `ai.localhost --aider|--opencode` ou `command aider` e `command opencode`.
 
 Ao iniciar, o comando sempre mostra um resumo curto com a URL da interface web, projeto e modelo ativos e os comandos para usar o modelo de código, baixar ou selecionar outro modelo e abrir outro projeto. A ajuda completa permanece disponível em `ai.localhost --help`.
 
@@ -600,10 +593,10 @@ aider --model ollama_chat/qwen3.5:9b
 
 Dentro do Aider, peça mudanças pequenas e revise o diff antes de commitar.
 
-Com a stack já ativa, os comandos diretos também funcionam dentro de qualquer repositório Git:
+Depois de abrir um novo terminal, os comandos diretos funcionam de forma integrada dentro de qualquer repositório Git:
 
 ```bash
-OLLAMA_API_BASE=http://localhost:11434 aider --model ollama_chat/qwen3.5:9b
+aider
 opencode
 ```
 
