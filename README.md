@@ -1,5 +1,15 @@
 # localhost.ai
 
+> ## Projeto interrompido
+>
+> O desenvolvimento do `localhost.ai` foi interrompido por falta de viabilidade prática para o hardware disponível.
+>
+> Após testes reais, o ambiente demonstrou exigir, no mínimo, **48 GB de RAM física** e **16 GB de VRAM** para oferecer uma experiência local minimamente estável e útil — especialmente em fluxos de agentes, análise de repositórios e uso de modelos voltados a programação.
+>
+> Como esses requisitos estão fora da capacidade de hardware atualmente disponível e não há previsão de atualização, o projeto não receberá novas funcionalidades ou suporte ativo.
+>
+> O repositório permanece público como registro do trabalho e pode ser útil como referência, mas deve ser considerado **arquivado / sem manutenção**.
+
 **Distribuição leve para criar uma estação de trabalho de IA local, com configuração reproduzível, opinativa e orientada à privacidade.**
 
 O **localhost.ai** integra execução de modelos, chat, RAG e desenvolvimento assistido por IA em Linux ou Windows com WSL2. Seu propósito não é ensinar a instalar produtos isolados: é reduzir as decisões, os riscos de configuração e o trabalho necessário para obter um ambiente coerente e compreensível.
