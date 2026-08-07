@@ -26,6 +26,7 @@ GPU_AVAILABLE=false
 GPU_VRAM_MB=0
 SYSTEM_RAM_MB=0
 REQUIRED_DISK_GB=0
+STACK_READY_TIMEOUT_SECONDS="${LOCALHOST_AI_STACK_READY_TIMEOUT_SECONDS:-180}"
 SCRIPT_ROOT=""
 USER_BIN_WAS_ON_PATH=false
 case ":${PATH}:" in
@@ -764,6 +765,7 @@ configure_https() {
 
 start_stack() {
   local attempt
+  local max_attempts
 
   info "Iniciando a stack local"
   if [[ "${GPU_AVAILABLE}" == true ]]; then
@@ -772,7 +774,11 @@ start_stack() {
     make -C "${INSTALL_DIR}" up
   fi
 
-  for attempt in $(seq 1 30); do
+  [[ "${STACK_READY_TIMEOUT_SECONDS}" =~ ^[1-9][0-9]*$ ]] \
+    || fail "LOCALHOST_AI_STACK_READY_TIMEOUT_SECONDS deve ser um número inteiro positivo"
+  max_attempts=$(((STACK_READY_TIMEOUT_SECONDS + 1) / 2))
+
+  for attempt in $(seq 1 "${max_attempts}"); do
     if make -C "${INSTALL_DIR}" test-ollama >/dev/null 2>&1 \
       && make -C "${INSTALL_DIR}" test-open-webui >/dev/null 2>&1; then
       success "Ollama e Open WebUI responderam corretamente"
