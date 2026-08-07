@@ -167,6 +167,10 @@ start_stack() {
     if make -C "${STACK_DIR}" test-ollama >/dev/null 2>&1; then
       return 0
     fi
+    if (( attempt == 1 || attempt % 5 == 0 )); then
+      printf 'Aguardando a inicialização do Ollama (%ss/60s)...\n' \
+        "$(((attempt - 1) * 2))"
+    fi
     sleep 2
   done
   fail "Ollama não respondeu; consulte: make -C ${STACK_DIR} logs"

@@ -192,6 +192,8 @@ Esse comando remoto é necessário apenas uma vez para preparar a máquina. Ao f
 https://ai.localhost
 ```
 
+Na primeira inicialização, o Open WebUI pode levar alguns minutos para ficar pronto. O instalador informa o progresso dessa espera e encerra com um diagnóstico se os serviços não responderem no prazo.
+
 Se você é desenvolvedor, escolha o assistente ao entrar em um repositório Git:
 
 ```bash

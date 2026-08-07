@@ -784,6 +784,10 @@ start_stack() {
       success "Ollama e Open WebUI responderam corretamente"
       return 0
     fi
+    if (( attempt == 1 || attempt % 5 == 0 )); then
+      printf 'Aguardando a inicialização dos serviços (%ss/%ss)...\n' \
+        "$(((attempt - 1) * 2))" "${STACK_READY_TIMEOUT_SECONDS}"
+    fi
     sleep 2
   done
 
