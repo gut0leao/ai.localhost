@@ -2,7 +2,7 @@
 
 [Voltar ao README](../README.md)
 
-O objetivo do **ai.localhost** é facilitar a instalação e configuração de ferramentas de IA em ambiente local. O projeto reúne Docker Compose, Ollama, Open WebUI, Aider, Caddy, mkcert e SearXNG opcional em uma experiência única, para que usuários não precisem selecionar, conectar e ajustar manualmente cada componente.
+O objetivo do **ai.localhost** é facilitar a instalação e configuração de ferramentas de IA em ambiente local. O projeto reúne Docker Compose, Ollama, Open WebUI, Aider, OpenCode, Caddy, mkcert e SearXNG opcional em uma experiência única, para que usuários não precisem selecionar, conectar e ajustar manualmente cada componente.
 
 ## O problema
 
@@ -26,7 +26,7 @@ Com poucas instruções e um único comando, o usuário obtém um ambiente local
 
 Para profissionais de áreas administrativas, o **Open WebUI** oferece uma interface semelhante às ferramentas de IA mais conhecidas. Por meio do navegador, o usuário pode conversar com o modelo, analisar arquivos, organizar documentos em bases de conhecimento e consultar informações internas sem enviá-las para um provedor externo.
 
-Para desenvolvedores, o **Aider** leva o modelo local ao terminal. Ele pode compreender um repositório, explicar código, propor alterações, criar testes e editar arquivos, mantendo o código-fonte no próprio ambiente de trabalho.
+Para desenvolvedores, o **Aider** leva o modelo local ao terminal. Ele pode compreender um repositório, explicar código, propor alterações, criar testes e editar arquivos, mantendo o código-fonte no próprio ambiente de trabalho. Como alternativa, o **OpenCode** oferece uma experiência de agente de terminal com sessões, subagentes, comandos, skills, MCPs e hooks, também conectada apenas ao Ollama local na configuração padrão.
 
 ## Complementar às soluções corporativas
 
@@ -52,6 +52,7 @@ As duas abordagens podem coexistir:
 | **CPU e GPU locais** | Fornecem a capacidade computacional da solução, aproveitando recursos já existentes na estação. |
 | **Open WebUI**       | Oferece a interface web para conversas, arquivos e bases de conhecimento.                       |
 | **Aider**            | Oferece assistência de programação diretamente nos repositórios locais.                         |
+| **OpenCode**         | Alternativa de agente de terminal local para programação, conectada ao Ollama; não duplica modelos. |
 | **Caddy e mkcert**   | Disponibilizam a interface por HTTPS, limitada à própria máquina.                               |
 | **SearXNG**          | Acrescenta busca na internet de forma opcional e controlada.                                    |
 | **ai.localhost**     | Unifica instalação, configuração, seleção de modelos e inicialização do ambiente.               |

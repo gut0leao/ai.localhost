@@ -7,9 +7,10 @@ STACK_DIR_FILE="${CONFIG_DIR}/stack-dir"
 STACK_DIR="${LOCAL_AI_INSTALL_DIR:-}"
 PROJECT_DIR="${PWD}"
 USE_CODE_MODEL=false
+USE_OPENCODE=false
 START_STACK=true
 MODEL_OVERRIDE=""
-AIDER_ARGS=()
+CLIENT_ARGS=()
 
 fail() {
   printf 'Erro: %s\n' "$*" >&2
@@ -22,15 +23,17 @@ Assistente local de programação
 
 Uso:
   ai.localhost [opções do Aider]
-  ai.localhost --project /caminho/do/repositorio [opções do Aider]
+  ai.localhost --opencode [opções do OpenCode]
+  ai.localhost --project /caminho/do/repositorio [opções]
 
 Opções do ambiente:
   --code             Usa o modelo especializado em código.
-  --project CAMINHO  Abre o Aider nesse repositório Git.
-  --no-start         Não tenta iniciar a stack antes de abrir o Aider.
+  --opencode         Abre o OpenCode; o Aider continua sendo o padrão.
+  --project CAMINHO  Abre a ferramenta nesse repositório Git.
+  --no-start         Não tenta iniciar a stack antes de abrir a ferramenta.
   -h, --help         Exibe esta ajuda.
 
-Todas as demais opções são encaminhadas ao Aider. Por exemplo:
+As demais opções são encaminhadas à ferramenta selecionada. Por exemplo:
   ai.localhost --message "explique este projeto"
   ai.localhost --model ollama_chat/outro-modelo
 EOF
@@ -38,6 +41,7 @@ EOF
 
 show_startup_guide() {
   local model="$1"
+  local client_name="$2"
 
   cat <<EOF
 Ambiente local de IA
@@ -47,12 +51,13 @@ Ambiente local de IA
 
 Atalhos úteis
   Modelo de código:  ai.localhost --code
-  Escolher modelo:   ai.localhost --model ollama_chat/<modelo>
+  Abrir OpenCode:    ai.localhost --opencode
+  Escolher modelo:   ai.localhost --model <modelo>
   Baixar modelo:     make -C "${STACK_DIR}" pull-model MODEL=<modelo>
   Outro projeto:     ai.localhost --project /caminho/do/projeto
   Todas as opções:   ai.localhost --help
 
-Abrindo o Aider...
+Abrindo o ${client_name}...
 
 EOF
 }
@@ -89,6 +94,9 @@ parse_args() {
       --code)
         USE_CODE_MODEL=true
         ;;
+      --opencode)
+        USE_OPENCODE=true
+        ;;
       --project)
         [[ $# -ge 2 ]] || fail "--project requer um caminho"
         PROJECT_DIR="$2"
@@ -110,7 +118,7 @@ parse_args() {
         MODEL_OVERRIDE="${1#--model=}"
         ;;
       *)
-        AIDER_ARGS+=("$1")
+        CLIENT_ARGS+=("$1")
         ;;
     esac
     shift
@@ -154,6 +162,7 @@ start_stack() {
 main() {
   local local_ai_ca_bundle
   local model
+  local opencode_model
   local ollama_port
 
   parse_args "$@"
@@ -164,7 +173,11 @@ main() {
   command -v make >/dev/null 2>&1 || fail "make não está instalado"
   command -v docker >/dev/null 2>&1 || fail "Docker não está instalado"
   command -v git >/dev/null 2>&1 || fail "Git não está instalado"
-  command -v aider >/dev/null 2>&1 || fail "Aider não está instalado"
+  if [[ "${USE_OPENCODE}" == true ]]; then
+    command -v opencode >/dev/null 2>&1 || fail "OpenCode não está instalado"
+  else
+    command -v aider >/dev/null 2>&1 || fail "Aider não está instalado"
+  fi
   [[ -d "${PROJECT_DIR}" ]] || fail "diretório não encontrado: ${PROJECT_DIR}"
   git -C "${PROJECT_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
     || fail "${PROJECT_DIR} não é um repositório Git; entre em um projeto ou use --project"
@@ -174,6 +187,8 @@ main() {
 
   if [[ -n "${MODEL_OVERRIDE}" ]]; then
     model="${MODEL_OVERRIDE}"
+  elif [[ "${USE_OPENCODE}" == true ]]; then
+    model="$(env_value OLLAMA_CODE_MODEL_DEFAULT)"
   elif [[ "${USE_CODE_MODEL}" == true ]]; then
     model="$(env_value OLLAMA_CODE_MODEL_DEFAULT)"
     model="${model:-$(env_value OLLAMA_AIDER_MODEL_DEFAULT)}"
@@ -182,8 +197,6 @@ main() {
   fi
   model="${model:-$(env_value OLLAMA_MODEL_DEFAULT)}"
   [[ -n "${model}" ]] || fail "nenhum modelo foi configurado em ${STACK_DIR}/.env"
-  [[ "${model}" == */* ]] || model="ollama_chat/${model}"
-
   ollama_port="$(env_value OLLAMA_PORT)"
   export OLLAMA_API_BASE="http://localhost:${ollama_port:-11434}"
   local_ai_ca_bundle="$(env_value LOCAL_AI_CA_BUNDLE)"
@@ -194,14 +207,22 @@ main() {
     export CURL_CA_BUNDLE="${CURL_CA_BUNDLE:-${local_ai_ca_bundle}}"
   fi
 
-  show_startup_guide "${model}"
   cd "${PROJECT_DIR}"
+  if [[ "${USE_OPENCODE}" == true ]]; then
+    opencode_model="${model#ollama/}"
+    [[ "${opencode_model}" == */* ]] || opencode_model="ollama/${opencode_model}"
+    show_startup_guide "${opencode_model}" "OpenCode"
+    exec opencode --model "${opencode_model}" "${CLIENT_ARGS[@]}"
+  fi
+
+  [[ "${model}" == */* ]] || model="ollama_chat/${model}"
+  show_startup_guide "${model}" "Aider"
   exec aider \
     --no-check-update \
     --no-show-release-notes \
     --no-browser \
     --model "${model}" \
-    "${AIDER_ARGS[@]}"
+    "${CLIENT_ARGS[@]}"
 }
 
 main "$@"

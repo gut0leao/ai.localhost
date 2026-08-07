@@ -1,0 +1,42 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama local",
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1"
+      },
+      "models": {
+        "qwen3.5:2b": { "name": "Qwen 3.5 2B" },
+        "qwen3.5:4b": { "name": "Qwen 3.5 4B" },
+        "qwen3.5:9b": { "name": "Qwen 3.5 9B" },
+        "qwen3.6:27b": { "name": "Qwen 3.6 27B" },
+        "qwen2.5-coder:1.5b": { "name": "Qwen 2.5 Coder 1.5B" },
+        "qwen2.5-coder:3b": { "name": "Qwen 2.5 Coder 3B" },
+        "qwen2.5-coder:7b": { "name": "Qwen 2.5 Coder 7B" },
+        "qwen3-coder:30b": { "name": "Qwen 3 Coder 30B" }
+      }
+    }
+  },
+  "permission": {
+    "*": "ask",
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow"
+    },
+    "glob": "allow",
+    "grep": "allow",
+    "edit": "ask",
+    "bash": "ask",
+    "task": "ask",
+    "external_directory": "deny",
+    "webfetch": "deny",
+    "websearch": "deny",
+    "lsp": "allow",
+    "skill": "ask",
+    "question": "allow"
+  }
+}

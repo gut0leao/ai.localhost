@@ -12,6 +12,9 @@ GENERAL_MODEL="${LOCAL_AI_GENERAL_MODEL:-}"
 CODE_MODEL="${LOCAL_AI_CODE_MODEL:-}"
 AIDER_MODEL="${LOCAL_AI_AIDER_MODEL:-}"
 AI_COMMAND_PATH="${HOME}/.local/bin/ai.localhost"
+OPENCODE_BINARY_PATH="${HOME}/.opencode/bin/opencode"
+OPENCODE_COMMAND_PATH="${HOME}/.local/bin/opencode"
+OPENCODE_CONFIG_PATH="${XDG_CONFIG_HOME:-${HOME}/.config}/opencode/opencode.json"
 ASSUME_YES=false
 CHECK_ONLY=false
 FORCE_CPU=false
@@ -307,6 +310,7 @@ collect_missing_packages() {
   local -n result_ref=$1
 
   command -v curl >/dev/null 2>&1 || result_ref+=(curl)
+  command -v tar >/dev/null 2>&1 || result_ref+=(tar)
   command -v git >/dev/null 2>&1 || result_ref+=(git)
   command -v make >/dev/null 2>&1 || result_ref+=(make)
   command -v python3 >/dev/null 2>&1 || result_ref+=(python3)
@@ -605,6 +609,61 @@ install_aider() {
   success "$(aider --version | head -n 1)"
 }
 
+install_opencode_configuration() {
+  local config_dir
+
+  config_dir="$(dirname "${OPENCODE_CONFIG_PATH}")"
+  if [[ -e "${OPENCODE_CONFIG_PATH}" ]]; then
+    success "configuração existente do OpenCode preservada em ${OPENCODE_CONFIG_PATH}"
+    return 0
+  fi
+
+  [[ -d "${config_dir}" ]] || state_mark opencode-config-dir-created
+  mkdir -p "${config_dir}"
+  backup_user_file_once "${OPENCODE_CONFIG_PATH}" opencode-config
+  install -m 0600 "${INSTALL_DIR}/opencode/opencode.json" "${OPENCODE_CONFIG_PATH}"
+  success "OpenCode configurado para usar o Ollama local"
+}
+
+install_opencode() {
+  info "Instalando OpenCode no ambiente do usuário"
+  export PATH="${HOME}/.local/bin:${HOME}/.opencode/bin:${PATH}"
+
+  if command -v opencode >/dev/null 2>&1 \
+    && opencode --version >/dev/null 2>&1; then
+    success "OpenCode já está instalado; preservando a instalação atual"
+    success "$(opencode --version | head -n 1)"
+    install_opencode_configuration
+    return 0
+  fi
+
+  if command -v opencode >/dev/null 2>&1; then
+    warn "o comando OpenCode encontrado no PATH não funciona neste Linux/WSL; instalando a versão nativa"
+  fi
+
+  if [[ ! -x "${OPENCODE_BINARY_PATH}" ]]; then
+    backup_user_file_once "${OPENCODE_BINARY_PATH}" opencode-binary
+    curl -fsSL https://opencode.ai/install | bash -s -- --no-modify-path
+    state_mark opencode-installed
+  fi
+
+  [[ -x "${OPENCODE_BINARY_PATH}" ]] \
+    || fail "OpenCode foi instalado, mas não foi encontrado em ${OPENCODE_BINARY_PATH}"
+
+  mkdir -p "${HOME}/.local/bin"
+  if [[ ! -e "${OPENCODE_COMMAND_PATH}" && ! -L "${OPENCODE_COMMAND_PATH}" ]]; then
+    backup_user_file_once "${OPENCODE_COMMAND_PATH}" opencode-command
+    ln -s "${OPENCODE_BINARY_PATH}" "${OPENCODE_COMMAND_PATH}"
+  elif [[ "$(readlink -f "${OPENCODE_COMMAND_PATH}" 2>/dev/null || true)" != "${OPENCODE_BINARY_PATH}" ]]; then
+    fail "já existe um comando OpenCode não gerenciado em ${OPENCODE_COMMAND_PATH}"
+  fi
+  [[ -x "${OPENCODE_COMMAND_PATH}" ]] \
+    || fail "não foi possível disponibilizar o comando OpenCode em ${OPENCODE_COMMAND_PATH}"
+
+  install_opencode_configuration
+  success "$(opencode --version | head -n 1)"
+}
+
 record_compose_images() {
   local image
 
@@ -682,6 +741,9 @@ Comandos úteis:
   Abrir com o modelo especializado em código:
     ai.localhost --code
 
+  Abrir o OpenCode com o modelo de código:
+    ai.localhost --opencode
+
   Abrir diretamente outro repositório:
     ai.localhost --project /caminho/do/projeto
 
@@ -713,7 +775,7 @@ Comandos úteis:
   Desinstalar completamente:
     curl -fsSL https://raw.githubusercontent.com/gut0leao/ai.localhost/main/uninstall.sh | bash
 
-O Aider será aberto somente dentro de um repositório Git escolhido por você.
+O Aider e o OpenCode serão abertos somente dentro de um repositório Git escolhido por você.
 ============================================================
 EOF
 }
@@ -801,6 +863,7 @@ main() {
   prepare_repository
   configure_environment
   install_aider
+  install_opencode
   record_compose_images
   configure_https
   start_stack

@@ -150,7 +150,7 @@ Serão removidos:
   - imagens Docker baixadas exclusivamente pelo instalador;
   - certificados locais e a confiança da CA criada pelo instalador;
   - comando ai.localhost e sua configuração;
-  - Aider e pacotes APT somente se instalados por este projeto;
+  - Aider, OpenCode e pacotes APT somente se instalados por este projeto;
   - configuração NVIDIA criada pelo instalador, restaurando daemon.json;
   - checkout da stack somente se ele foi clonado pelo instalador.
 
@@ -305,6 +305,18 @@ remove_aider() {
   fi
 }
 
+remove_opencode() {
+  local binary_path="${HOME}/.opencode/bin/opencode"
+  local command_path="${HOME}/.local/bin/opencode"
+
+  [[ "${HAS_STATE}" == true && -e "${STATE_DIR}/opencode-installed" ]] || return 0
+  info "Removendo OpenCode instalado pelo projeto"
+  restore_user_file "${command_path}" opencode-command
+  restore_user_file "${binary_path}" opencode-binary
+  rmdir "${HOME}/.opencode/bin" 2>/dev/null || true
+  rmdir "${HOME}/.opencode" 2>/dev/null || true
+}
+
 remove_created_directory() {
   local directory="$1"
   local marker="$2"
@@ -340,6 +352,7 @@ remove_path_entries() {
 restore_user_configuration() {
   local launcher_path="${HOME}/.local/bin/ai.localhost"
   local stack_config_path="${XDG_CONFIG_HOME:-${HOME}/.config}/local-coding-ai/stack-dir"
+  local opencode_config_path="${XDG_CONFIG_HOME:-${HOME}/.config}/opencode/opencode.json"
 
   if [[ -r "${STATE_DIR}/launcher-path" ]]; then
     IFS= read -r launcher_path <"${STATE_DIR}/launcher-path"
@@ -357,13 +370,15 @@ restore_user_configuration() {
   if [[ "${HAS_STATE}" == true ]]; then
     restore_user_file "${launcher_path}" launcher
     restore_user_file "${stack_config_path}" stack-dir-config
+    restore_user_file "${opencode_config_path}" opencode-config
     restore_user_file "${INSTALL_DIR}/.env" environment
     remove_path_entries
   else
-    rm -f -- "${launcher_path}" "${stack_config_path}"
+    rm -f -- "${launcher_path}" "${stack_config_path}" "${opencode_config_path}"
   fi
 
   rmdir "$(dirname "${stack_config_path}")" 2>/dev/null || true
+  rmdir "$(dirname "${opencode_config_path}")" 2>/dev/null || true
 }
 
 restore_nvidia_configuration() {
@@ -429,6 +444,7 @@ main() {
   remove_stack
   remove_certificates
   remove_aider
+  remove_opencode
   restore_user_configuration
   restore_nvidia_configuration
   restore_checkout_revision
